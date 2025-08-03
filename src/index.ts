@@ -42,6 +42,7 @@ program
   .option('-s, --search', 'Enable fuzzy search mode')
   .option('-p, --project <name>', 'Limit search to specific project')
   .option('--create', 'Create workspace if it doesn\'t exist')
+  .option('--path-only', 'Output only the workspace path (useful for shell integration)')
   .action(switchCommand);
 
 program

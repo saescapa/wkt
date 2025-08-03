@@ -77,13 +77,18 @@ export async function switchCommand(
     dbManager.updateWorkspace(selectedWorkspace);
     dbManager.setCurrentWorkspace(selectedWorkspace.id);
 
-    console.log(chalk.green(`✓ Switched to workspace '${selectedWorkspace.name}'`));
-    console.log(chalk.gray(`  Project: ${selectedWorkspace.projectName}`));
-    console.log(chalk.gray(`  Branch: ${selectedWorkspace.branchName}`));
-    console.log(chalk.gray(`  Path: ${selectedWorkspace.path}`));
+    if (options.pathOnly) {
+      console.log(selectedWorkspace.path);
+    } else {
+      console.log(chalk.green(`✓ Switched to workspace '${selectedWorkspace.name}'`));
+      console.log(chalk.gray(`  Project: ${selectedWorkspace.projectName}`));
+      console.log(chalk.gray(`  Branch: ${selectedWorkspace.branchName}`));
+      console.log(chalk.gray(`  Path: ${selectedWorkspace.path}`));
 
-    console.log(chalk.blue('\nTo navigate to the workspace:'));
-    console.log(chalk.bold(`  cd "${selectedWorkspace.path}"`));
+      console.log(chalk.blue('\nTo navigate to the workspace:'));
+      console.log(chalk.bold(`  cd "${selectedWorkspace.path}"`));
+      console.log(chalk.gray('\nOr use: alias wkts=\'cd $(wkt switch --path-only)\''));
+    }
 
   } catch (error) {
     console.error(chalk.red(`Error switching to workspace: ${error instanceof Error ? error.message : error}`));

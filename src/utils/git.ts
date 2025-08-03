@@ -128,10 +128,26 @@ export class GitUtils {
   }
 
   static async createWorktree(bareRepoPath: string, workspacePath: string, branchName: string, baseBranch?: string): Promise<void> {
-    if (baseBranch) {
+    const branchExists = await this.branchExists(bareRepoPath, branchName);
+    
+    if (baseBranch && !branchExists) {
       await this.executeCommand(`git worktree add "${workspacePath}" -b "${branchName}" "${baseBranch}"`, bareRepoPath);
     } else {
       await this.executeCommand(`git worktree add "${workspacePath}" "${branchName}"`, bareRepoPath);
+    }
+  }
+
+  static async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
+    try {
+      await this.executeCommand(`git show-ref --verify --quiet refs/heads/${branchName}`, bareRepoPath);
+      return true;
+    } catch {
+      try {
+        await this.executeCommand(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, bareRepoPath);
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 

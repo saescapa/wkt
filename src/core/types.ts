@@ -102,4 +102,5 @@ export interface CommandOptions {
   merged?: boolean;
   olderThan?: string;
   list?: boolean;
+  pathOnly?: boolean;
 }
