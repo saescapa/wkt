@@ -135,6 +135,15 @@ export class GitUtils {
     } else {
       await this.executeCommand(`git worktree add "${workspacePath}" "${branchName}"`, bareRepoPath);
     }
+
+    // Add origin remote to the worktree so git rebase origin/main works
+    try {
+      const originUrl = await this.executeCommand('git remote get-url origin', bareRepoPath);
+      await this.executeCommand(`git remote add origin "${originUrl}"`, workspacePath);
+    } catch (error) {
+      // If getting/setting origin fails, continue - worktree will still function
+      console.warn('Warning: Could not configure origin remote in worktree');
+    }
   }
 
   static async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
