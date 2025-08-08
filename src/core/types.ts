@@ -45,6 +45,12 @@ export interface ProjectConfig {
   inference?: {
     patterns?: InferencePattern[];
   };
+  local_files?: {
+    shared?: string[];        // Files symlinked to main worktree (e.g., CLAUDE.md)
+    copied?: string[];        // Files copied from templates (e.g., .env)
+    templates?: Record<string, string | TemplateConfig>;  // target -> source or config
+    workspace_templates?: Record<string, Record<string, string | TemplateConfig>>; // workspace-specific overrides
+  };
 }
 
 export interface InferencePattern {
@@ -72,8 +78,24 @@ export interface GlobalConfig {
   inference: {
     patterns: InferencePattern[];
   };
+  local_files: {
+    shared: string[];
+    copied: string[];
+    templates: Record<string, string | TemplateConfig>;
+    workspace_templates: Record<string, Record<string, string | TemplateConfig>>;
+  };
   projects: Record<string, ProjectConfig>;
   aliases: Record<string, string>;
+}
+
+export interface TemplateConfig {
+  source: string;           // Template file path
+  conditions?: {
+    branch_pattern?: string;    // Regex pattern for branch names
+    workspace_pattern?: string; // Regex pattern for workspace names  
+    environment?: string;       // Environment type (staging, production, etc.)
+  };
+  variables?: Record<string, string>; // Template variables to substitute
 }
 
 export interface WKTDatabase {

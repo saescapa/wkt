@@ -6,6 +6,7 @@ import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
 import { BranchInference } from '../utils/branch-inference.js';
+import { LocalFilesManager } from '../utils/local-files.js';
 
 export async function createCommand(
   projectName: string,
@@ -14,6 +15,7 @@ export async function createCommand(
 ): Promise<void> {
   const configManager = new ConfigManager();
   const dbManager = new DatabaseManager();
+  const localFilesManager = new LocalFilesManager();
 
   const project = dbManager.getProject(projectName);
   if (!project) {
@@ -95,6 +97,12 @@ export async function createCommand(
 
     dbManager.addWorkspace(workspace);
     dbManager.setCurrentWorkspace(workspaceId);
+
+    // Setup local files (symlinks and copies)
+    await localFilesManager.setupLocalFiles(project, workspacePath, projectConfig, config, {
+      name: workspaceName,
+      branchName: inferredBranchName
+    });
 
     console.log(chalk.green(`✓ Successfully created workspace '${workspaceName}'`));
     console.log(chalk.gray(`  Path: ${workspacePath}`));

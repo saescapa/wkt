@@ -1,0 +1,91 @@
+# Example WKT project configuration  
+# Place this file as .wkt.yaml in your project root
+# Supports workspace-specific templates for different environments
+
+local_files:
+  # Files that will be symlinked to the main worktree
+  # These files stay synchronized across all workspaces
+  shared:
+    - "CLAUDE.md"                    # AI context and instructions
+    - ".cursor/rules"                # Cursor editor rules
+    - "README-dev.md"                # Development documentation
+    - "docs/contributing.md"         # Shared documentation
+    - ".github/pull_request_template.md"
+
+  # Files that will be copied from templates
+  # These become workspace-specific after copying
+  copied:
+    - ".env.local"                   # Local environment variables
+    - ".vscode/launch.json"          # Debug configurations
+    - "docker-compose.override.yml"  # Local docker overrides
+
+  # Template mappings (source -> target)
+  # If not specified, copies from main worktree directly
+  templates:
+    ".env.local": ".env.local.example"
+    ".vscode/launch.json": ".vscode/launch.json.template"
+    "docker-compose.override.yml": "docker-compose.override.example.yml"
+
+  # Workspace-specific template overrides
+  # Pattern -> template mappings that apply when workspace/branch matches
+  workspace_templates:
+    # For any workspace with "staging" in the name
+    "*staging*":
+      ".env.local": ".env.staging.example"
+      "docker-compose.override.yml":
+        source: "docker-compose.staging.yml"
+        variables:
+          database_host: "staging-db.example.com"
+          api_url: "https://api-staging.example.com"
+    
+    # For production branches/workspaces  
+    "*production*":
+      ".env.local": ".env.production.example"
+      "docker-compose.override.yml":
+        source: "docker-compose.prod.yml"
+        conditions:
+          branch_pattern: "^(main|master|release/.*)$"
+        variables:
+          database_host: "prod-db.example.com"
+          api_url: "https://api.example.com"
+    
+    # For feature branches
+    "feature/*":
+      ".env.local":
+        source: ".env.dev.example"
+        variables:
+          feature_flag: "true"
+          debug_mode: "true"
+          workspace_id: "{{workspace_name}}"
+    
+    # For hotfix branches - use production-like settings
+    "hotfix/*":
+      ".env.local":
+        source: ".env.prod.example"
+        conditions:
+          branch_pattern: "^hotfix/.*"
+        variables:
+          debug_mode: "false"
+          log_level: "warn"
+
+# Project-specific git settings
+git:
+  default_base: "main"
+  auto_fetch: true
+  push_on_create: false
+
+# Workspace naming strategy
+workspace:
+  naming_strategy: "sanitized"     # or "kebab-case", "snake_case"
+  auto_cleanup: true
+  max_age_days: 30
+
+# Branch name inference patterns
+inference:
+  patterns:
+    - pattern: '^(\d+)$'
+      template: 'feature/eng-{}'
+    - pattern: '^(feature/.+)$'
+      template: '{}'
+    - pattern: '^(bugfix/.+)$'
+      template: '{}'

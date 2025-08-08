@@ -139,6 +139,159 @@ WKT can automatically infer branch names from patterns:
 
 Configure custom patterns in `~/.wkt/config.yaml`.
 
+## Local Files Management
+
+WKT automatically manages local development files across workspaces, enabling seamless sharing of configuration and context while preserving workspace-specific customizations.
+
+### Features
+
+- **Shared Files**: Symlinked across all workspaces (e.g., `CLAUDE.md`, `.cursor/rules`)
+- **Workspace-Specific Files**: Copied from templates for per-workspace customization (e.g., `.env.local`)
+- **Environment-Specific Templates**: Different templates based on workspace/branch patterns
+- **Template Variables**: Dynamic variable substitution in template files
+- **Conditional Templates**: Templates with branch/workspace matching conditions
+- **Automatic Setup**: Files are configured during workspace creation
+- **Smart Main Detection**: Automatically finds your main worktree as the source
+
+### Configuration
+
+Add to your `~/.wkt/config.yaml`:
+
+```yaml
+local_files:
+  shared:                           # Files symlinked to main worktree
+    - "CLAUDE.md"                  # AI context shared across workspaces
+    - ".cursor/rules"              # Editor rules
+    - "docs/development.md"        # Shared documentation
+  
+  copied:                          # Files copied from templates
+    - ".env.local"                 # Environment variables
+    - ".vscode/launch.json"        # Debug configurations
+  
+  templates:                       # Template mappings
+    ".env.local": ".env.local.example"
+    ".vscode/launch.json": ".vscode/launch.json.template"
+```
+
+Or configure per-project by adding `.wkt.yaml` to your project root:
+
+```yaml
+local_files:
+  shared: ["CLAUDE.md", "README-dev.md"]
+  copied: [".env.local"]
+  templates:
+    ".env.local": ".env.local.example"
+  
+  # Workspace-specific templates for different environments
+  workspace_templates:
+    "*staging*":                          # Any workspace with "staging" in name
+      ".env.local": ".env.staging.example"
+    "feature/*":                          # Feature branches
+      ".env.local":
+        source: ".env.dev.example"
+        variables:
+          debug_mode: "true"
+          feature_flag: "{{workspace_name}}"
+```
+
+> See [`.wkt.yaml.example`](.wkt.yaml.example) for a complete configuration example with advanced workspace templates.
+
+### Workflow
+
+1. **Create main workspace**: `wkt create myproject main` 
+2. **Add shared files**: Create `CLAUDE.md`, `.cursor/rules` in main workspace
+3. **Create feature workspace**: `wkt create myproject feature-auth`
+   - Shared files are automatically symlinked
+   - Template files are copied for workspace-specific use
+
+4. **Update shared context**: Edit `CLAUDE.md` in any workspace → all workspaces see changes
+5. **Workspace-specific config**: Edit `.env.local` in each workspace independently
+
+### Example Structure
+
+```
+~/.wkt/workspaces/myproject/
+├── main/
+│   ├── CLAUDE.md                 # Original file
+│   ├── .cursor/rules            # Original file  
+│   └── .env.local               # Workspace-specific
+└── feature-auth/
+    ├── CLAUDE.md -> ../main/CLAUDE.md        # Symlinked
+    ├── .cursor/rules -> ../main/.cursor/rules # Symlinked
+    └── .env.local               # Independent copy
+```
+
+### Workspace-Specific Templates
+
+WKT supports environment-specific configurations by allowing different templates based on workspace or branch patterns:
+
+#### Pattern Matching
+- `"staging"` - Exact workspace name match
+- `"*staging*"` - Workspace name contains "staging"
+- `"feature/*"` - Branch pattern matching
+- `"*prod*"` - Any workspace containing "prod"
+
+#### Template Configuration Options
+
+**Simple Template Path:**
+```yaml
+workspace_templates:
+  "*staging*":
+    ".env.local": ".env.staging.example"
+```
+
+**Advanced Template Config:**
+```yaml
+workspace_templates:
+  "feature/*":
+    ".env.local":
+      source: ".env.dev.example"                # Template file
+      variables:                                 # Variable substitution
+        debug_mode: "true"
+        feature_flag: "{{workspace_name}}"      # Built-in variables
+      conditions:                               # Additional conditions
+        branch_pattern: "^feature/.*"
+        environment: "development"
+```
+
+**Built-in Variables:**
+- `{{workspace_name}}` - Current workspace name
+- `{{branch_name}}` - Current branch name
+- Custom variables defined in the `variables` section
+
+#### Real-World Example
+
+```yaml
+local_files:
+  copied: [".env.local", "docker-compose.override.yml"]
+  workspace_templates:
+    # Development workspaces
+    "feature/*":
+      ".env.local":
+        source: ".env.dev.example"
+        variables:
+          DATABASE_URL: "postgresql://localhost:5432/myapp_dev"
+          DEBUG: "true"
+    
+    # Staging workspaces
+    "*staging*":
+      ".env.local": ".env.staging.example"
+      "docker-compose.override.yml":
+        source: "docker-compose.staging.yml"
+        variables:
+          API_URL: "https://api-staging.mycompany.com"
+    
+    # Production-like workspaces
+    "hotfix/*":
+      ".env.local":
+        source: ".env.prod.example"
+        conditions:
+          branch_pattern: "^(hotfix|release)/.*"
+        variables:
+          DATABASE_URL: "postgresql://prod-replica.mycompany.com:5432/myapp"
+          DEBUG: "false"
+```
+
 ## Development Status
 
 ### ✅ Implemented
@@ -149,6 +302,7 @@ Configure custom patterns in `~/.wkt/config.yaml`.
 - Branch name inference
 - Configuration management
 - Interactive selection with fuzzy search
+- **Local files management** - Symlinked shared files and workspace-specific copies
 
 ### 🚧 Planned
 - Status command (`wkt status`)
