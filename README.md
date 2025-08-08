@@ -40,6 +40,9 @@ wkt switch feature-awesome-feature
 
 # Switch interactively
 wkt switch
+
+# Shell integration - automatically cd to workspace
+cd "$(wkt switch feature-awesome-feature --path-only)"
 ```
 
 ## Core Commands
@@ -90,6 +93,9 @@ wkt switch -
 
 # Fuzzy search
 wkt switch auth --search
+
+# Output only the path (for shell integration)
+wkt switch auth-system --path-only
 ```
 
 ### `wkt list`
@@ -346,3 +352,85 @@ See [TESTING.md](TESTING.md) for detailed testing information.
 - **Git worktrees** for workspace isolation
 
 Built with modern Node.js practices, comprehensive testing, and designed for extensibility.
+
+## Shell Integration
+
+WKT includes a `--path-only` option that outputs just the workspace path, making it easy to integrate with shell functions for automatic directory changes.
+
+### Basic Usage
+
+```bash
+# Switch and cd in one command
+cd "$(wkt switch workspace-name --path-only)"
+
+# Interactive switch with cd
+cd "$(wkt switch --path-only)"
+```
+
+### Shell Functions
+
+Add these to your `.bashrc`, `.zshrc`, or equivalent:
+
+```bash
+# Switch to workspace and cd automatically
+function wkts() {
+    local path=$(wkt switch "$@" --path-only)
+    if [ $? -eq 0 ] && [ -n "$path" ]; then
+        cd "$path"
+    fi
+}
+
+# Interactive workspace switch with cd
+function wkti() {
+    local path=$(wkt switch --path-only)
+    if [ $? -eq 0 ] && [ -n "$path" ]; then
+        cd "$path"
+    fi
+}
+
+# Quick switch to last workspace
+function wktl() {
+    local path=$(wkt switch - --path-only)
+    if [ $? -eq 0 ] && [ -n "$path" ]; then
+        cd "$path"
+    fi
+}
+```
+
+### Usage Examples
+
+```bash
+# Switch and cd to workspace
+wkts feature-auth
+
+# Interactive switch with cd
+wkti
+
+# Switch to last workspace with cd  
+wktl
+
+# Fuzzy search switch with cd
+wkts auth --search
+```
+
+### Advanced Shell Integration
+
+For more sophisticated workflows, you can create aliases that combine multiple operations:
+
+```bash
+# Switch workspace and run common setup
+function wktdev() {
+    local path=$(wkt switch "$@" --path-only)
+    if [ $? -eq 0 ] && [ -n "$path" ]; then
+        cd "$path"
+        echo "Switched to workspace: $(basename "$path")"
+        
+        # Optional: run common development commands
+        if [ -f "package.json" ]; then
+            echo "📦 Node.js project detected"
+        fi
+        
+        git status --short
+    fi
+}
+```
