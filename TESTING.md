@@ -99,6 +99,8 @@ bun run test:watch        # Run tests in watch mode
 ### ❌ **Not Yet Covered**
 - Git operations (GitUtils class)
 - Real git worktree creation/management
+- **Local files management** - Symlink creation, template processing, workspace-specific templates
+- **Workspace-specific template configuration** - Pattern matching, variable substitution
 - File system operations
 - Cross-platform compatibility
 - Performance under load
@@ -111,15 +113,18 @@ The CLI has been thoroughly manually tested with:
 - ✅ Workspace switching and listing
 - ✅ Error scenarios and edge cases
 - ✅ Configuration and database persistence
+- ✅ **Local files management** - Symlink and template file setup during workspace creation
 
 ## Future Testing Improvements
 
 1. **Fix Test Isolation**: Update config/database tests to use isolated environments
 2. **Improve Git Mocking**: Create more realistic git operation mocks
-3. **Add Performance Tests**: Test with many projects/workspaces
-4. **Cross-Platform Tests**: Test on Windows, macOS, Linux
-5. **Real Git Integration Tests**: Test with actual git repositories
-6. **Add Coverage Reporting**: Track test coverage metrics
+3. **Add Local Files Tests**: Test symlink creation, template processing, workspace-specific configs
+4. **Add Template Engine Tests**: Test pattern matching, variable substitution, conditional templates
+5. **Add Performance Tests**: Test with many projects/workspaces
+6. **Cross-Platform Tests**: Test on Windows, macOS, Linux
+7. **Real Git Integration Tests**: Test with actual git repositories
+8. **Add Coverage Reporting**: Track test coverage metrics
 
 ## Continuous Integration
 

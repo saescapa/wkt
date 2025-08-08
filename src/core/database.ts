@@ -114,6 +114,10 @@ export class DatabaseManager {
     return Object.values(db.workspaces).filter(w => w.projectName === projectName);
   }
 
+  getProjectWorkspaces(projectName: string): Workspace[] {
+    return this.getWorkspacesByProject(projectName);
+  }
+
   updateWorkspace(workspace: Workspace): void {
     const db = this.getDatabase();
     if (db.workspaces[workspace.id]) {

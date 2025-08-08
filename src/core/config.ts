@@ -38,6 +38,14 @@ export class ConfigManager {
           { pattern: '^(feature/.+)$', template: '{}' },
         ],
       },
+      local_files: {
+        shared: [],
+        copied: ['.env.local'],
+        templates: {
+          '.env.local': '.env.local.example'
+        },
+        workspace_templates: {}
+      },
       projects: {},
       aliases: {
         ls: 'list',
