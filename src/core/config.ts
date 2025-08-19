@@ -40,10 +40,8 @@ export class ConfigManager {
       },
       local_files: {
         shared: [],
-        copied: ['.env.local'],
-        templates: {
-          '.env.local': '.env.local.example'
-        },
+        copied: [],
+        templates: {},
         workspace_templates: {}
       },
       projects: {},
