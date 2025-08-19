@@ -9,6 +9,8 @@ import { listCommand } from './commands/list.js';
 import { statusCommand } from './commands/status.js';
 import { cleanCommand } from './commands/clean.js';
 import { projectCommand } from './commands/project.js';
+import { configCommand } from './commands/config.js';
+import { syncCommand } from './commands/sync.js';
 
 program
   .name('wkt')
@@ -79,6 +81,24 @@ program
   .argument('<subcommand>', 'Subcommand: list, info, rename, remove, add, default')
   .argument('[...args]', 'Arguments for the subcommand')
   .action(projectCommand);
+
+program
+  .command('config')
+  .description('Manage WKT configuration')
+  .argument('[subcommand]', 'Subcommand: show, edit, open, path, debug (default: show)')
+  .option('--project <name>', 'Work with project-specific config')
+  .option('--global', 'Work with global config (default)')
+  .action(configCommand);
+
+program
+  .command('sync')
+  .description('Sync local files to existing workspaces')
+  .option('--project <name>', 'Sync specific project only')
+  .option('--workspace <name>', 'Sync specific workspace only')
+  .option('--all', 'Sync all workspaces without confirmation')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--dry', 'Show what would be synced (dry run)')
+  .action(syncCommand);
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));
