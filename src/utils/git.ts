@@ -125,6 +125,9 @@ export class GitUtils {
 
   static async cloneBareRepository(repoUrl: string, targetPath: string): Promise<void> {
     await this.executeCommand(`git clone --bare "${repoUrl}" "${targetPath}"`);
+    
+    // Add origin remote to bare repository so worktrees can inherit it
+    await this.executeCommand(`git remote add origin "${repoUrl}"`, targetPath);
   }
 
   static async createWorktree(bareRepoPath: string, workspacePath: string, branchName: string, baseBranch?: string): Promise<void> {
@@ -136,12 +139,20 @@ export class GitUtils {
       await this.executeCommand(`git worktree add "${workspacePath}" "${branchName}"`, bareRepoPath);
     }
 
-    // Add origin remote to the worktree so git rebase origin/main works
+    // Ensure origin remote is properly configured in the worktree
     try {
       const originUrl = await this.executeCommand('git remote get-url origin', bareRepoPath);
-      await this.executeCommand(`git remote add origin "${originUrl}"`, workspacePath);
+      
+      // Check if origin already exists in worktree
+      try {
+        await this.executeCommand('git remote get-url origin', workspacePath);
+        // Origin exists, update it to match bare repo
+        await this.executeCommand(`git remote set-url origin "${originUrl}"`, workspacePath);
+      } catch {
+        // Origin doesn't exist, add it
+        await this.executeCommand(`git remote add origin "${originUrl}"`, workspacePath);
+      }
     } catch (error) {
-      // If getting/setting origin fails, continue - worktree will still function
       console.warn('Warning: Could not configure origin remote in worktree');
     }
   }
@@ -201,6 +212,11 @@ export class GitUtils {
     await this.executeCommand('git fetch --all', bareRepoPath);
   }
 
+  static async fetchInWorkspace(workspacePath: string): Promise<void> {
+    // Fetch in the workspace - this updates the shared repository refs
+    await this.executeCommand('git fetch origin', workspacePath);
+  }
+
   static async getDefaultBranch(bareRepoPath: string): Promise<string> {
     try {
       const result = await this.executeCommand('git symbolic-ref refs/remotes/origin/HEAD', bareRepoPath);
@@ -219,5 +235,23 @@ export class GitUtils {
         return 'main';
       }
     }
+  }
+
+  static async rebaseBranch(workspacePath: string, baseBranch: string): Promise<void> {
+    await this.executeCommand(`git rebase origin/${baseBranch}`, workspacePath);
+  }
+
+  static async pullWithRebase(workspacePath: string): Promise<void> {
+    await this.executeCommand('git pull --rebase', workspacePath);
+  }
+
+  static async pushBranch(workspacePath: string, branchName: string, force: boolean = false): Promise<void> {
+    const forceFlag = force ? '--force-with-lease' : '';
+    await this.executeCommand(`git push origin ${branchName} ${forceFlag}`.trim(), workspacePath);
+  }
+
+  static async isWorkingTreeClean(workspacePath: string): Promise<boolean> {
+    const status = await this.getWorkspaceStatus(workspacePath);
+    return status.clean;
   }
 }
