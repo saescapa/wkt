@@ -50,7 +50,8 @@ async function showConfig(configManager: ConfigManager, options: ConfigOptions):
   }
 }
 
-async function openConfig(configManager: ConfigManager, options: ConfigOptions): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function openConfig(configManager: ConfigManager, _options: ConfigOptions): Promise<void> {
   const configPath = join(homedir(), '.wkt', 'config.yaml');
   
   if (!existsSync(configPath)) {
@@ -88,7 +89,8 @@ async function showConfigPath(configManager: ConfigManager, options: ConfigOptio
   }
 }
 
-async function debugConfig(configManager: ConfigManager, options: ConfigOptions): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function debugConfig(configManager: ConfigManager, _options: ConfigOptions): Promise<void> {
   const configPath = join(homedir(), '.wkt', 'config.yaml');
   const projectConfigPath = join(process.cwd(), '.wkt.yaml');
   

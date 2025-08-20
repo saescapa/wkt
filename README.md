@@ -305,17 +305,17 @@ local_files:
 - Workspace creation (`wkt create`)
 - Workspace switching (`wkt switch`) 
 - Workspace listing (`wkt list`)
+- Cleanup command (`wkt clean`)
+- Sync command (`wkt sync`)
+- Configuration management (`wkt config`)
 - Branch name inference
-- Configuration management
 - Interactive selection with fuzzy search
 - **Local files management** - Symlinked shared files and workspace-specific copies
 
-### 🚧 Planned
-- Status command (`wkt status`)
-- Cleanup command (`wkt clean`)
-- Project management (`wkt project`)
-- Sync command (`wkt sync`)
-- Execute in workspace (`wkt exec`)
+### 💭 Future Ideas
+- Status command (`wkt status`) - show git status across workspaces
+- Project management (`wkt project`) - manage multiple projects
+- Execute in workspace (`wkt exec`) - run commands in specific workspaces
 - Zsh completions
 - Workspace templates
 - SQLite database (currently using JSON)

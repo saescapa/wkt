@@ -6,9 +6,7 @@ import { initCommand } from './commands/init.js';
 import { createCommand } from './commands/create.js';
 import { switchCommand } from './commands/switch.js';
 import { listCommand } from './commands/list.js';
-import { statusCommand } from './commands/status.js';
 import { cleanCommand } from './commands/clean.js';
-import { projectCommand } from './commands/project.js';
 import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
 
@@ -58,14 +56,6 @@ program
   .action(listCommand);
 
 program
-  .command('status')
-  .description('Show detailed status of workspace(s)')
-  .argument('[workspace]', 'Workspace name (optional for current)')
-  .option('-a, --all', 'Show status for all workspaces')
-  .option('-p, --project <name>', 'Show status for specific project')
-  .action(statusCommand);
-
-program
   .command('clean')
   .description('Clean up workspaces')
   .argument('[workspace]', 'Specific workspace to clean')
@@ -74,13 +64,6 @@ program
   .option('--older-than <duration>', 'Remove workspaces older than duration')
   .option('--force', 'Force removal without confirmation')
   .action(cleanCommand);
-
-program
-  .command('project')
-  .description('Manage projects (repositories)')
-  .argument('<subcommand>', 'Subcommand: list, info, rename, remove, add, default')
-  .argument('[...args]', 'Arguments for the subcommand')
-  .action(projectCommand);
 
 program
   .command('config')

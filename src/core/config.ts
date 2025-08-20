@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from 'yaml';
-import type { GlobalConfig, Project, ProjectConfig } from './types.js';
+import type { GlobalConfig, ProjectConfig } from './types.js';
 
 export class ConfigManager {
   private configDir: string;
@@ -10,15 +10,17 @@ export class ConfigManager {
   private config: GlobalConfig | null = null;
 
   constructor() {
-    this.configDir = join(homedir(), '.wkt');
+    const homeDirectory = process.env.HOME || homedir();
+    this.configDir = join(homeDirectory, '.wkt');
     this.configPath = join(this.configDir, 'config.yaml');
   }
 
   private getDefaultConfig(): GlobalConfig {
+    const homeDirectory = process.env.HOME || homedir();
     return {
       wkt: {
-        workspace_root: join(homedir(), '.wkt', 'workspaces'),
-        projects_root: join(homedir(), '.wkt', 'projects'),
+        workspace_root: join(homeDirectory, '.wkt', 'workspaces'),
+        projects_root: join(homeDirectory, '.wkt', 'projects'),
       },
       workspace: {
         naming_strategy: 'sanitized',

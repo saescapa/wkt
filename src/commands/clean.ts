@@ -1,6 +1,5 @@
 import chalk from 'chalk';
 import { existsSync, rmSync } from 'fs';
-import { join } from 'path';
 import type { CommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
