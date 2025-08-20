@@ -1,7 +1,7 @@
-import { existsSync, symlinkSync, copyFileSync, readFileSync, writeFileSync, lstatSync, mkdirSync } from 'fs';
+import { existsSync, symlinkSync, copyFileSync, readFileSync, writeFileSync, lstatSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join, dirname, relative, resolve } from 'path';
 import chalk from 'chalk';
-import type { Project, ProjectConfig, TemplateConfig } from '../core/types.js';
+import type { Project, ProjectConfig, TemplateConfig, GlobalConfig } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 
 export class LocalFilesManager {
@@ -11,7 +11,7 @@ export class LocalFilesManager {
     this.dbManager = new DatabaseManager();
   }
 
-  async setupLocalFiles(project: Project, workspacePath: string, projectConfig: ProjectConfig, globalConfig: any, workspace?: { name: string; branchName: string }): Promise<void> {
+  async setupLocalFiles(project: Project, workspacePath: string, projectConfig: ProjectConfig, globalConfig: GlobalConfig, workspace?: { name: string; branchName: string }): Promise<void> {
     const mainWorktreePath = this.findMainWorktree(project);
     if (!mainWorktreePath) {
       console.log(chalk.yellow('⚠️  No main worktree found, skipping local files setup'));
@@ -76,7 +76,11 @@ export class LocalFilesManager {
       .filter(w => existsSync(w.path))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     
-    return sortedWorkspaces.length > 0 ? sortedWorkspaces[0].path : null;
+    if (sortedWorkspaces.length > 0) {
+      const firstWorkspace = sortedWorkspaces[0];
+      return firstWorkspace ? firstWorkspace.path : null;
+    }
+    return null;
   }
 
   private async createSymlink(mainWorktreePath: string, workspacePath: string, filePath: string): Promise<void> {
@@ -130,7 +134,7 @@ export class LocalFilesManager {
     }
   }
 
-  private resolveTemplates(projectConfig: ProjectConfig, globalConfig: any, workspace?: { name: string; branchName: string }): Record<string, TemplateConfig | string> {
+  private resolveTemplates(projectConfig: ProjectConfig, globalConfig: GlobalConfig, workspace?: { name: string; branchName: string }): Record<string, TemplateConfig | string> {
     // Start with global templates
     const templates = { ...globalConfig.local_files?.templates || {} };
     
@@ -173,20 +177,20 @@ export class LocalFilesManager {
   }
 
   private async copyFile(mainWorktreePath: string, workspacePath: string, filePath: string, templateConfig?: TemplateConfig | string, workspace?: { name: string; branchName: string }): Promise<void> {
-    const targetFile = join(workspacePath, filePath);
+    const targetPath = join(workspacePath, filePath);
 
-    // Skip if file already exists in workspace
-    if (existsSync(targetFile)) {
+    // Skip if file/directory already exists in workspace
+    if (existsSync(targetPath)) {
       return;
     }
 
-    let sourceFile: string;
+    let sourcePath: string;
     let templateName: string = filePath;
     
     if (templateConfig) {
       if (typeof templateConfig === 'string') {
         // Simple string template path
-        sourceFile = join(mainWorktreePath, templateConfig);
+        sourcePath = join(mainWorktreePath, templateConfig);
         templateName = templateConfig;
       } else {
         // TemplateConfig object
@@ -194,29 +198,67 @@ export class LocalFilesManager {
           console.log(chalk.gray(`⚠️  Template conditions not met for ${filePath}, skipping`));
           return;
         }
-        sourceFile = join(mainWorktreePath, templateConfig.source);
+        sourcePath = join(mainWorktreePath, templateConfig.source);
         templateName = templateConfig.source;
       }
     } else {
-      // Use the file from main worktree
-      sourceFile = join(mainWorktreePath, filePath);
+      // Use the file/directory from main worktree
+      sourcePath = join(mainWorktreePath, filePath);
     }
 
-    if (!existsSync(sourceFile)) {
-      console.log(chalk.yellow(`⚠️  Template file not found, skipping: ${templateName}`));
+    if (!existsSync(sourcePath)) {
+      console.log(chalk.yellow(`⚠️  Template source not found, skipping: ${templateName}`));
       return;
     }
 
-    // Ensure target directory exists
-    const targetDir = dirname(targetFile);
-    if (!existsSync(targetDir)) {
-      mkdirSync(targetDir, { recursive: true });
+    // Check if source is a directory
+    const sourceStats = statSync(sourcePath);
+    if (sourceStats.isDirectory()) {
+      await this.copyDirectory(sourcePath, targetPath, templateConfig, workspace);
+      console.log(chalk.green(`✓ Copied directory: ${filePath}${templateName !== filePath ? ` (from ${templateName})` : ''}`));
+    } else {
+      // Handle file copying
+      await this.copyFileContent(sourcePath, targetPath, templateConfig, workspace);
+      console.log(chalk.green(`✓ Copied: ${filePath}${templateName !== filePath ? ` (from ${templateName})` : ''}`));
     }
+  }
 
+  private async copyDirectory(sourcePath: string, targetPath: string, templateConfig?: TemplateConfig | string, workspace?: { name: string; branchName: string }): Promise<void> {
     try {
-      let content = readFileSync(sourceFile, 'utf-8');
+      // Create target directory
+      mkdirSync(targetPath, { recursive: true });
+
+      // Copy all contents recursively
+      const items = readdirSync(sourcePath);
       
-      // Apply template variable substitution if configured
+      for (const item of items) {
+        const sourceItemPath = join(sourcePath, item);
+        const targetItemPath = join(targetPath, item);
+        
+        const itemStats = statSync(sourceItemPath);
+        
+        if (itemStats.isDirectory()) {
+          await this.copyDirectory(sourceItemPath, targetItemPath, templateConfig, workspace);
+        } else {
+          await this.copyFileContent(sourceItemPath, targetItemPath, templateConfig, workspace);
+        }
+      }
+    } catch (error) {
+      console.log(chalk.red(`✗ Failed to copy directory ${sourcePath}: ${error}`));
+    }
+  }
+
+  private async copyFileContent(sourcePath: string, targetPath: string, templateConfig?: TemplateConfig | string, workspace?: { name: string; branchName: string }): Promise<void> {
+    try {
+      // Ensure target directory exists
+      const targetDir = dirname(targetPath);
+      if (!existsSync(targetDir)) {
+        mkdirSync(targetDir, { recursive: true });
+      }
+
+      let content = readFileSync(sourcePath, 'utf-8');
+      
+      // Apply template variable substitution if configured (only for text files with template config)
       if (typeof templateConfig === 'object' && templateConfig.variables) {
         for (const [key, value] of Object.entries(templateConfig.variables)) {
           const placeholder = `{{${key}}}`;
@@ -230,10 +272,15 @@ export class LocalFilesManager {
         }
       }
       
-      writeFileSync(targetFile, content);
-      console.log(chalk.green(`✓ Copied: ${filePath}${templateName !== filePath ? ` (from ${templateName})` : ''}`));
+      writeFileSync(targetPath, content);
     } catch (error) {
-      console.log(chalk.red(`✗ Failed to copy ${filePath}: ${error}`));
+      // If it's a binary file or encoding issue, copy as-is
+      try {
+        copyFileSync(sourcePath, targetPath);
+      } catch (copyError) {
+        console.log(chalk.red(`✗ Failed to copy file ${sourcePath}: ${copyError}`));
+        throw copyError;
+      }
     }
   }
 
