@@ -57,6 +57,10 @@ export async function initCommand(
   if (!inferredProjectName) {
     const urlParts = repoUrl.split('/');
     const lastPart = urlParts[urlParts.length - 1];
+    if (!lastPart) {
+      console.error(chalk.red('Error: Could not infer project name from repository URL.'));
+      process.exit(1);
+    }
     inferredProjectName = lastPart.replace(/\.git$/, '');
   }
 

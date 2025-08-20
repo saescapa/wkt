@@ -106,6 +106,7 @@ export class TestEnvironment {
       version: '1.0.0',
     }, null, 2));
   }
+
 }
 
 export class MockGitUtils {

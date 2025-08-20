@@ -89,16 +89,19 @@ projects:
 
   describe('updateConfig', () => {
     it('should update and save config', () => {
+      const customWorkspaces = join(testEnv.testDir, 'custom', 'workspaces');
+      const customProjects = join(testEnv.testDir, 'custom', 'projects');
+      
       configManager.updateConfig({
         wkt: {
-          workspace_root: '/custom/workspaces',
-          projects_root: '/custom/projects',
+          workspace_root: customWorkspaces,
+          projects_root: customProjects,
         },
       });
       
       const config = configManager.getConfig();
-      expect(config.wkt.workspace_root).toBe('/custom/workspaces');
-      expect(config.wkt.projects_root).toBe('/custom/projects');
+      expect(config.wkt.workspace_root).toBe(customWorkspaces);
+      expect(config.wkt.projects_root).toBe(customProjects);
     });
   });
 

@@ -8,8 +8,8 @@ export class DatabaseManager {
   private dbPath: string;
   private db: WKTDatabase | null = null;
 
-  constructor() {
-    this.configManager = new ConfigManager();
+  constructor(configManager?: ConfigManager) {
+    this.configManager = configManager || new ConfigManager();
     this.dbPath = join(this.configManager.getConfig().wkt.workspace_root, '..', 'database.json');
   }
 

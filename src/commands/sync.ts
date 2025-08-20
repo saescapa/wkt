@@ -1,10 +1,10 @@
 import { existsSync } from 'fs';
-import { join } from 'path';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { LocalFilesManager } from '../utils/local-files.js';
+import type { Workspace } from '../core/types.js';
 
 interface SyncOptions {
   project?: string;
@@ -65,6 +65,11 @@ export async function syncCommand(options: SyncOptions = {}): Promise<void> {
       
       if (!options.dry) {
         const project = databaseManager.getProject(workspace.projectName);
+        if (!project) {
+          console.error(chalk.red(`Error: Project '${workspace.projectName}' not found.`));
+          errors++;
+          continue;
+        }
         const globalConfig = configManager.getConfig();
         const projectConfig = configManager.getProjectConfig(workspace.projectName);
         
@@ -114,7 +119,7 @@ export async function syncCommand(options: SyncOptions = {}): Promise<void> {
   }
 }
 
-async function getWorkspacesToSync(databaseManager: DatabaseManager, options: SyncOptions) {
+async function getWorkspacesToSync(databaseManager: DatabaseManager, options: SyncOptions): Promise<Workspace[]> {
   const allWorkspaces = databaseManager.getAllWorkspaces();
 
   // Filter by project
@@ -124,8 +129,9 @@ async function getWorkspacesToSync(databaseManager: DatabaseManager, options: Sy
 
   // Filter by specific workspace
   if (options.workspace) {
+    const workspaceFilter = options.workspace;
     workspaces = workspaces.filter(ws => 
-      ws.name === options.workspace || ws.name.includes(options.workspace)
+      ws.name === workspaceFilter || ws.name.includes(workspaceFilter)
     );
   }
 

@@ -116,11 +116,17 @@ function groupWorkspacesByProject(workspaces: Workspace[]): Record<string, Works
     if (!groups[workspace.projectName]) {
       groups[workspace.projectName] = [];
     }
-    groups[workspace.projectName].push(workspace);
+    const projectGroup = groups[workspace.projectName];
+    if (projectGroup) {
+      projectGroup.push(workspace);
+    }
   });
 
   Object.keys(groups).forEach(projectName => {
-    groups[projectName].sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime());
+    const projectGroup = groups[projectName];
+    if (projectGroup) {
+      projectGroup.sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime());
+    }
   });
 
   return groups;

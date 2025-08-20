@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import type { WorkspaceStatus } from '../core/types.js';
@@ -7,6 +7,10 @@ export class GitUtils {
   static async executeCommand(command: string, cwd?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const [cmd, ...args] = command.split(' ');
+      if (!cmd) {
+        reject(new Error('Invalid command'));
+        return;
+      }
       const process = spawn(cmd, args, { 
         cwd, 
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -16,15 +20,15 @@ export class GitUtils {
       let stdout = '';
       let stderr = '';
 
-      process.stdout?.on('data', (data) => {
+      process.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      process.stderr?.on('data', (data) => {
+      process.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
+      process.on('close', (code: number | null) => {
         if (code === 0) {
           resolve(stdout.trim());
         } else {
