@@ -57,12 +57,13 @@ program
 
 program
   .command('clean')
-  .description('Clean up workspaces')
+  .description('Clean up workspaces (defaults to merged branches only)')
   .argument('[workspace]', 'Specific workspace to clean')
   .option('-p, --project <name>', 'Clean specific project')
-  .option('--merged', 'Remove merged workspaces')
-  .option('--older-than <duration>', 'Remove workspaces older than duration')
+  .option('--merged', 'Remove merged workspaces (default behavior)')
+  .option('--older-than <duration>', 'Remove workspaces older than duration (e.g., 30d, 2w, 6m, 1y)')
   .option('--force', 'Force removal without confirmation')
+  .option('--all', 'Clean all workspaces (overrides --merged default)')
   .action(cleanCommand);
 
 program

@@ -3,6 +3,28 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import type { WorkspaceStatus } from '../core/types.js';
 
+export function parseDuration(duration: string): number {
+  const regex = /^(\d+)([dwmy])$/;
+  const match = duration.match(regex);
+  
+  if (!match) {
+    throw new Error(`Invalid duration format: ${duration}. Use format like '30d', '2w', '6m', '1y'`);
+  }
+  
+  const value = parseInt(match[1]!, 10);
+  const unit = match[2]!;
+  
+  const msInDay = 24 * 60 * 60 * 1000;
+  
+  switch (unit) {
+    case 'd': return value * msInDay;
+    case 'w': return value * 7 * msInDay;
+    case 'm': return value * 30 * msInDay;
+    case 'y': return value * 365 * msInDay;
+    default: throw new Error(`Unknown duration unit: ${unit}`);
+  }
+}
+
 export class GitUtils {
   static async executeCommand(command: string, cwd?: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -12,7 +34,7 @@ export class GitUtils {
         return;
       }
       const process = spawn(cmd, args, { 
-        cwd, 
+        cwd: cwd || undefined, 
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true 
       });
@@ -257,5 +279,35 @@ export class GitUtils {
   static async isWorkingTreeClean(workspacePath: string): Promise<boolean> {
     const status = await this.getWorkspaceStatus(workspacePath);
     return status.clean;
+  }
+
+  static async isBranchMerged(bareRepoPath: string, branchName: string, baseBranch: string = 'main'): Promise<boolean> {
+    try {
+      // Check if branch is merged into base branch
+      const result = await this.executeCommand(`git branch --merged ${baseBranch}`, bareRepoPath);
+      const mergedBranches = result.split('\n')
+        .map(line => line.trim().replace(/^\*\s*/, ''))
+        .filter(line => line.length > 0);
+      
+      return mergedBranches.includes(branchName);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  static async getBranchAge(bareRepoPath: string, branchName: string): Promise<Date | null> {
+    try {
+      // Get the date of the last commit on the branch
+      const result = await this.executeCommand(`git log -1 --format=%ct ${branchName}`, bareRepoPath);
+      const timestamp = parseInt(result.trim(), 10);
+      
+      if (isNaN(timestamp)) {
+        return null;
+      }
+      
+      return new Date(timestamp * 1000);
+    } catch (error) {
+      return null;
+    }
   }
 }

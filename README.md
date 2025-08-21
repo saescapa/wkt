@@ -115,6 +115,40 @@ wkt list --details
 wkt list --filter "feature/*"
 ```
 
+### `wkt clean`
+Clean up workspaces (defaults to merged branches only).
+
+```bash
+# Clean merged workspaces (default behavior)
+wkt clean
+
+# Clean all workspaces (bypass merged filter)
+wkt clean --all
+
+# Clean specific project
+wkt clean --project myproject
+
+# Remove workspaces older than 30 days
+wkt clean --older-than 30d
+
+# Combine filters: merged branches older than 2 weeks
+wkt clean --merged --older-than 2w
+
+# Force remove specific workspace without confirmation
+wkt clean feature-auth --force
+
+# Force clean all without confirmation
+wkt clean --all --force
+```
+
+**Safety Features:**
+- **Merged branches only**: By default, only cleans branches merged into main/master
+- **Main branch protection**: Never cleans main/master workspaces (contain shared files)
+- **Confirmation prompts**: Shows what will be cleaned and asks for confirmation
+- **Multiple filters**: Combine `--merged`, `--older-than`, and `--project` options
+
+**Duration formats**: `30d` (days), `2w` (weeks), `6m` (months), `1y` (years)
+
 ## Configuration
 
 WKT stores configuration in `~/.wkt/config.yaml` and workspace metadata in `~/.wkt/database.json`.
@@ -305,7 +339,7 @@ local_files:
 - Workspace creation (`wkt create`)
 - Workspace switching (`wkt switch`) 
 - Workspace listing (`wkt list`)
-- Cleanup command (`wkt clean`)
+- **Smart cleanup command (`wkt clean`)** - Defaults to merged branches only, with age filters and confirmation prompts
 - Sync command (`wkt sync`)
 - Configuration management (`wkt config`)
 - Branch name inference
