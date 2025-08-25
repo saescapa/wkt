@@ -116,36 +116,43 @@ wkt list --filter "feature/*"
 ```
 
 ### `wkt clean`
-Clean up workspaces (defaults to merged branches only).
+Clean up workspaces with interactive selection (defaults to merged branches only).
 
 ```bash
-# Clean merged workspaces (default behavior)
+# Clean merged workspaces with interactive selection (default behavior)
 wkt clean
 
-# Clean all workspaces (bypass merged filter)
+# Clean all workspaces with interactive selection (bypass merged filter)
 wkt clean --all
 
-# Clean specific project
+# Clean specific project with interactive selection
 wkt clean --project myproject
 
-# Remove workspaces older than 30 days
+# Remove workspaces older than 30 days with interactive selection
 wkt clean --older-than 30d
 
 # Combine filters: merged branches older than 2 weeks
 wkt clean --merged --older-than 2w
 
-# Force remove specific workspace without confirmation
-wkt clean feature-auth --force
+# Force clean (overrides safety checks) with interactive selection
+wkt clean --force
 
-# Force clean all without confirmation
-wkt clean --all --force
+# Force remove specific workspace (overrides safety checks)
+wkt clean feature-auth --force
 ```
 
+**Interactive Selection:**
+- **Checkbox interface**: Select/deselect workspaces with spacebar, confirm with enter
+- **All checked by default**: All eligible workspaces are pre-selected for convenience
+- **Visual indicators**: ⚠️ for protected workspaces (main branches), • for regular workspaces
+- **Always available**: Interactive selection shown for both normal and `--force` modes
+
 **Safety Features:**
-- **Merged branches only**: By default, only cleans branches merged into main/master
-- **Main branch protection**: Never cleans main/master workspaces (contain shared files)
-- **Confirmation prompts**: Shows what will be cleaned and asks for confirmation
+- **Enhanced merge detection**: Detects GitHub-style squash merges and PR-based merges
+- **Local branch protection**: Never cleans local-only branches that were never pushed
+- **Main branch protection**: Never cleans main/master workspaces (contain shared files) unless forced
 - **Multiple filters**: Combine `--merged`, `--older-than`, and `--project` options
+- **Force override**: Use `--force` to clean protected workspaces (still shows interactive selection)
 
 **Duration formats**: `30d` (days), `2w` (weeks), `6m` (months), `1y` (years)
 
@@ -339,7 +346,7 @@ local_files:
 - Workspace creation (`wkt create`)
 - Workspace switching (`wkt switch`) 
 - Workspace listing (`wkt list`)
-- **Smart cleanup command (`wkt clean`)** - Defaults to merged branches only, with age filters and confirmation prompts
+- **Interactive cleanup command (`wkt clean`)** - Enhanced merge detection, interactive selection, and local branch protection
 - Sync command (`wkt sync`)
 - Configuration management (`wkt config`)
 - Branch name inference

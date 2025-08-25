@@ -152,8 +152,15 @@ export class GitUtils {
   static async cloneBareRepository(repoUrl: string, targetPath: string): Promise<void> {
     await this.executeCommand(`git clone --bare "${repoUrl}" "${targetPath}"`);
     
-    // Add origin remote to bare repository so worktrees can inherit it
-    await this.executeCommand(`git remote add origin "${repoUrl}"`, targetPath);
+    // Check if origin remote already exists (git clone --bare creates it automatically)
+    try {
+      await this.executeCommand('git remote get-url origin', targetPath);
+      // Origin exists, update it to ensure it matches
+      await this.executeCommand(`git remote set-url origin "${repoUrl}"`, targetPath);
+    } catch {
+      // Origin doesn't exist, add it
+      await this.executeCommand(`git remote add origin "${repoUrl}"`, targetPath);
+    }
   }
 
   static async createWorktree(bareRepoPath: string, workspacePath: string, branchName: string, baseBranch?: string): Promise<void> {
@@ -283,13 +290,100 @@ export class GitUtils {
 
   static async isBranchMerged(bareRepoPath: string, branchName: string, baseBranch: string = 'main'): Promise<boolean> {
     try {
-      // Check if branch is merged into base branch
+      // Method 1: Check if branch is merged using traditional git branch --merged
       const result = await this.executeCommand(`git branch --merged ${baseBranch}`, bareRepoPath);
       const mergedBranches = result.split('\n')
         .map(line => line.trim().replace(/^\*\s*/, ''))
         .filter(line => line.length > 0);
       
-      return mergedBranches.includes(branchName);
+      if (mergedBranches.includes(branchName)) {
+        return true;
+      }
+
+      // Method 2: Check for GitHub-style merges (squash merges, merge commits)
+      // Look for merge commits in the base branch that reference the branch name or PR patterns
+      const branchParts = branchName.split('/');
+      const searchTerms = [
+        branchName,
+        branchParts[branchParts.length - 1], // Just the last part (e.g., "w34-2" from "misc/w34-2")
+        branchName.replace('/', '\\/'),      // Escaped version
+      ];
+      
+      for (const term of searchTerms) {
+        const mergeCommits = await this.executeCommand(
+          `git log --oneline --all --grep="${term}" origin/${baseBranch} | head -5`,
+          bareRepoPath
+        );
+        
+        if (mergeCommits.trim().length > 0) {
+          return true;
+        }
+      }
+
+      // Method 2b: Check for recent PR merges and match against branch patterns
+      const prNumberSearch = await this.executeCommand(
+        `git log --oneline origin/${baseBranch} --since="30 days ago" | grep "(#[0-9]"`,
+        bareRepoPath
+      );
+      
+      if (prNumberSearch.trim().length > 0 && branchParts.length > 1) {
+        // For misc branches like "misc/w34-2", check if there are recent "miscellaneous" commits
+        const branchType = branchParts[0]?.toLowerCase(); // e.g., "misc"
+        
+        if (branchType) {
+          // Check if branch type matches common patterns (misc->miscellaneous, feat->feature, etc.)
+          const typePatterns = {
+            'misc': ['misc', 'miscellaneous'],
+            'feat': ['feat', 'feature'],
+            'fix': ['fix'],
+            'chore': ['chore'],
+          };
+          
+          const patterns = typePatterns[branchType as keyof typeof typePatterns] || [branchType];
+          
+          for (const pattern of patterns) {
+            if (prNumberSearch.toLowerCase().includes(pattern)) {
+              // Found a potential match - this is likely a squash merge
+              // Check if the branch age suggests it was merged recently
+              const branchAge = await this.getBranchAge(bareRepoPath, branchName);
+              if (branchAge && (Date.now() - branchAge.getTime()) < 30 * 24 * 60 * 60 * 1000) { // 30 days
+                return true;
+              }
+            }
+          }
+        }
+      }
+
+      // Method 3: Check if branch exists on remote (if not, it might have been deleted after merge)
+      try {
+        await this.executeCommand(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, bareRepoPath);
+        // Branch still exists on remote, so probably not merged
+        return false;
+      } catch {
+        // Branch doesn't exist on remote anymore - but was it ever pushed?
+        // Check git reflog or recent fetch logs to see if this branch was ever tracked
+        try {
+          // Check if we have any record of this branch being on remote
+          const reflogCheck = await this.executeCommand(`git reflog --all --grep="origin/${branchName}" | head -1`, bareRepoPath);
+          if (reflogCheck.trim().length === 0) {
+            // No evidence this branch was ever on remote - it's local-only, don't clean
+            return false;
+          }
+        } catch {
+          // If reflog fails, err on the side of caution - don't clean local-only branches
+          return false;
+        }
+        
+        // Branch was on remote but now deleted - check if it was likely merged
+        const recentCommits = await this.executeCommand(
+          `git log --oneline origin/${baseBranch} --since="30 days ago" | head -50`,
+          bareRepoPath
+        );
+        
+        // Look for commits that might reference the branch name or PR number
+        const branchSearch = branchName.toLowerCase();
+        return recentCommits.toLowerCase().includes(branchSearch);
+      }
     } catch (error) {
       return false;
     }

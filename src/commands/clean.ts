@@ -109,36 +109,54 @@ async function cleanAllWorkspaces(
     return;
   }
 
-  // Show what will be cleaned
-  console.log(chalk.cyan(`Found ${workspacesToClean.length} workspace(s) to clean:`));
-  for (const workspace of workspacesToClean) {
+  // Show what can be cleaned and let user select
+  console.log(chalk.cyan(`Found ${workspacesToClean.length} workspace(s) that can be cleaned:`));
+  
+  // Interactive selection with checkboxes (always show, regardless of force flag)
+  const choices = workspacesToClean.map(workspace => {
+    const project = db.getProject(workspace.projectName);
+    const isMain = project && isMainBranchWorkspace(workspace, project);
+    const marker = isMain ? '⚠️ ' : '';
+    const projectInfo = workspace.projectName !== workspace.name ? ` [${workspace.projectName}]` : '';
+    
+    return {
+      name: `${marker}${workspace.name} (${workspace.branchName})${projectInfo}`,
+      value: workspace,
+      checked: true // Default to checked
+    };
+  });
+
+  const { selectedForCleanup } = await inquirer.prompt([
+    {
+      type: 'checkbox',
+      name: 'selectedForCleanup',
+      message: options.force 
+        ? 'Select workspaces to force clean (use space to toggle, enter to confirm):' 
+        : 'Select workspaces to clean (use space to toggle, enter to confirm):',
+      choices: choices,
+      pageSize: Math.min(10, choices.length),
+    }
+  ]);
+
+  const selectedWorkspaces = selectedForCleanup as Workspace[];
+
+  if (selectedWorkspaces.length === 0) {
+    console.log(chalk.yellow('No workspaces selected for cleanup'));
+    return;
+  }
+
+  console.log(chalk.cyan(`\nSelected ${selectedWorkspaces.length} workspace(s) for cleanup:`));
+  for (const workspace of selectedWorkspaces) {
     const project = db.getProject(workspace.projectName);
     const isMain = project && isMainBranchWorkspace(workspace, project);
     const marker = isMain ? chalk.red('⚠️ ') : chalk.green('• ');
     console.log(`${marker}${workspace.name} (${workspace.branchName})`);
   }
 
-  // Confirm cleanup unless force is used
-  if (!options.force) {
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: `Clean ${workspacesToClean.length} workspace(s)?`,
-        default: false
-      }
-    ]);
-
-    if (!confirm) {
-      console.log(chalk.yellow('Cleanup cancelled'));
-      return;
-    }
-  }
-
   // Clean workspaces
   let cleanedCount = 0;
   
-  for (const workspace of workspacesToClean) {
+  for (const workspace of selectedWorkspaces) {
     const project = db.getProject(workspace.projectName);
     if (!project) continue;
 
