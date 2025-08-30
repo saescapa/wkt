@@ -1,6 +1,6 @@
 # Example WKT project configuration  
 # Place this file as .wkt.yaml in your project root
-# Supports workspace-specific templates for different environments
+# Comprehensive example showing local files management AND script execution
 
 local_files:
   # Files that will be symlinked to the main worktree
@@ -89,3 +89,181 @@ inference:
       template: '{}'
     - pattern: '^(bugfix/.+)$'
       template: '{}'
+
+# Script execution configuration (SAFE)
+scripts:
+  # Security: Only allow these commands to be executed
+  allowed_commands:
+    - "pnpm"
+    - "npm" 
+    - "yarn"
+    - "bun"
+    - "node"
+    - "git"
+    - "docker"
+    - "docker-compose"
+    - "planetscale"         # For database branch management
+    - "pscale"             # PlanetScale CLI alternative name
+    - "make"
+    - "./scripts/"         # Local scripts in scripts/ directory
+    - "scripts/"           # Alternative path
+
+  # Predefined safe scripts
+  scripts:
+    install-deps:
+      name: "Install Dependencies"
+      command: ["pnpm", "install"]
+      description: "Install npm dependencies"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 300000  # 5 minutes
+
+    build-project:
+      name: "Build Project"  
+      command: ["pnpm", "run", "build"]
+      description: "Build the project"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 600000  # 10 minutes
+      
+    setup-cursor-theme:
+      name: "Setup Cursor Theme"
+      command: ["./scripts/setup-cursor-theme.sh", "{{workspace_name}}"]
+      description: "Configure workspace-specific Cursor theme"
+      conditions:
+        file_exists: ["scripts/setup-cursor-theme.sh"]
+      optional: true
+        
+    create-db-branch:
+      name: "Create Database Branch"
+      command: ["pscale", "branch", "create", "{{project_name}}", "{{branch_name}}"]
+      description: "Create PlanetScale database branch matching git branch"
+      conditions:
+        file_exists: [".env.local", "planetscale.yml"]
+      optional: true
+
+    setup-docker-env:
+      name: "Setup Docker Environment"
+      command: ["docker-compose", "up", "-d"]
+      description: "Start Docker development environment"
+      conditions:
+        file_exists: ["docker-compose.yml"]
+      optional: true
+      background: true
+
+  # Scripts that run automatically after workspace creation
+  hooks:
+    post_create:
+      - script: "install-deps"
+      - script: "build-project"
+        conditions:
+          file_missing: ["dist/"]  # Only build if dist doesn't exist
+      - script: "setup-cursor-theme"
+      - script: "create-db-branch"
+        variables:
+          branch_name: "{{workspace_name}}"  # Use workspace name for DB branch
+
+  # Named shortcuts for convenience
+  shortcuts:
+    i: "install-deps"
+    build: "build-project"  
+    db: "create-db-branch"
+    docker: "setup-docker-env"
+
+  # Workspace-specific script overrides
+  workspace_scripts:
+    # Feature branches get additional development setup
+    "feature/*":
+      post_create:
+        - script: "install-deps"
+        - script: "setup-cursor-theme"
+        - script: "create-db-branch"
+          variables:
+            branch_name: "dev-{{workspace_name}}"
+      scripts:
+        dev-server:
+          name: "Development Server"
+          command: ["pnpm", "run", "dev"]
+          description: "Start development server with hot reload"
+          background: true
+
+    # Staging workspaces use different database
+    "*staging*":
+      scripts:
+        create-db-branch:
+          name: "Create Staging Database Branch"
+          command: ["pscale", "branch", "create", "{{project_name}}", "staging-{{workspace_name}}"]
+          description: "Create staging database branch"
+
+    # Production-like branches need special handling  
+    "hotfix/*":
+      post_create:
+        - script: "install-deps"
+        # Skip automatic build for hotfixes - manual verification required
+      scripts:
+        create-db-branch:
+          name: "Create Hotfix Database Branch"
+          command: ["pscale", "branch", "create", "{{project_name}}", "hotfix-{{workspace_name}}"]
+          description: "Create hotfix database branch"
+
+# Additional script examples for common use cases
+  
+  # AI/Development workflow scripts
+  scripts:
+    setup-ai-context:
+      name: "Setup AI Development Context"
+      command: ["./scripts/setup-ai-context.sh", "{{workspace_name}}", "{{branch_name}}"]
+      description: "Configure AI tools (Cursor, etc.) for this workspace"
+      conditions:
+        file_exists: ["scripts/setup-ai-context.sh"]
+      optional: true
+
+    sync-terminal-theme:
+      name: "Sync Terminal Theme"
+      command: ["./scripts/sync-terminal-theme.sh", "{{project_name}}", "{{workspace_name}}"]
+      description: "Update terminal/shell theme to match workspace"
+      conditions:
+        file_exists: ["scripts/sync-terminal-theme.sh"]
+      optional: true
+      background: true
+
+    run-tests:
+      name: "Run Test Suite"
+      command: ["pnpm", "run", "test"]
+      description: "Run all tests"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 600000  # 10 minutes
+
+    clean-build:
+      name: "Clean and Build"
+      command: ["pnpm", "run", "clean", "&&", "pnpm", "run", "build"]
+      description: "Clean previous build and rebuild"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 900000  # 15 minutes
+
+  # Database management scripts
+    reset-database:
+      name: "Reset Development Database"
+      command: ["./scripts/reset-dev-db.sh", "{{workspace_name}}"]
+      description: "Reset database to clean state for development"
+      conditions:
+        file_exists: ["scripts/reset-dev-db.sh", ".env.local"]
+      optional: true
+
+    migrate-database:
+      name: "Run Database Migrations"
+      command: ["pnpm", "run", "db:migrate"]
+      description: "Apply pending database migrations"
+      conditions:
+        file_exists: ["package.json"]
+      optional: true
+
+  # Additional shortcuts for convenience
+  shortcuts:
+    t: "run-tests"
+    clean: "clean-build"
+    reset: "reset-database"
+    migrate: "migrate-database"
+    theme: "sync-terminal-theme"

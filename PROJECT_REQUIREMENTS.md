@@ -246,22 +246,41 @@ wkt sync --project midnights --all
 wkt sync --rebase
 ```
 
-#### `wkt exec <command> [options]`
-Execute command in workspace(s).
+#### `wkt exec <workspace> <command> [options]` ✅ IMPLEMENTED
+Execute commands directly in specific workspaces with safety checks.
 
 ```bash
-# Run in current workspace
-wkt exec npm test
+# Execute in specific workspace
+wkt exec myproject/feature-auth pnpm build
 
-# Run in specific workspace (auto-detects project)
-wkt exec --workspace vault-door npm install
+# Execute in current workspace
+wkt exec . "npm test"
 
-# Run in all workspaces of a project
-wkt exec --project folklore --all git status
+# Execute with safety bypass
+wkt exec feature-auth pnpm install --force
 
-# Run in workspaces matching pattern across all projects
-wkt exec --filter "feature/*" npm run lint
+# Dry run to preview execution
+wkt exec main docker-compose up --dry
 ```
+
+#### `wkt run <script-name> [workspace] [options]` ✅ IMPLEMENTED
+Run predefined scripts in workspaces (safer than direct execution).
+
+```bash
+# Run script in current workspace
+wkt run install-deps
+
+# Run script in specific workspace
+wkt run build myproject/main
+
+# List available scripts
+wkt run list
+
+# Run with dry-run preview
+wkt run setup-database --dry
+```
+
+**Security Features**: Command allowlisting, confirmation prompts, workspace path restrictions, timeout limits, and dry-run mode.
 
 ### Utility Commands
 

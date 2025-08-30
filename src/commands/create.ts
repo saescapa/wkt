@@ -7,6 +7,7 @@ import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
+import { SafeScriptExecutor } from '../utils/script-executor.js';
 
 export async function createCommand(
   projectName: string,
@@ -108,6 +109,13 @@ export async function createCommand(
     console.log(chalk.gray(`  Path: ${workspacePath}`));
     console.log(chalk.gray(`  Branch: ${inferredBranchName}`));
     console.log(chalk.gray(`  Base: ${baseBranch}`));
+
+    // Execute post-creation hooks
+    const scriptConfig = projectConfig.scripts || config.scripts;
+    if (scriptConfig) {
+      const context = SafeScriptExecutor.createContext(workspace, project);
+      await SafeScriptExecutor.executePostCreationHooks(context, scriptConfig, options);
+    }
 
     if (options.checkout !== false) {
       console.log(chalk.blue(`\nTo switch to this workspace:`));
