@@ -141,6 +141,49 @@ wkt clean --force
 wkt clean feature-auth --force
 ```
 
+### `wkt exec`
+Execute commands directly in workspaces with safety checks.
+
+```bash
+# Execute command in specific workspace
+wkt exec myproject/feature-auth pnpm build
+
+# Execute in current workspace
+wkt exec . "npm test"
+
+# Execute with confirmation bypass
+wkt exec feature-auth pnpm install --force
+
+# Dry run to see what would be executed
+wkt exec main docker-compose up --dry
+
+# Execute with custom timeout (in milliseconds)
+wkt exec feature-auth "npm run build" --timeout 300000
+```
+
+### `wkt run`
+Run predefined scripts in workspaces (safer than direct execution).
+
+```bash
+# Run script in current workspace
+wkt run install-deps
+
+# Run script in specific workspace
+wkt run build myproject/main
+
+# List all available scripts
+wkt run list
+
+# Run with dry-run mode
+wkt run setup-database --dry
+
+# Run workspace-specific script
+wkt run dev-server  # Only available for feature/* branches
+
+# Use script shortcuts
+wkt run i           # Shortcut for "install-deps"
+```
+
 **Interactive Selection:**
 - **Checkbox interface**: Select/deselect workspaces with spacebar, confirm with enter
 - **All checked by default**: All eligible workspaces are pre-selected for convenience
@@ -175,6 +218,84 @@ Default directory structure:
     └── other-project/
         └── feature-docs/
 ```
+
+### Script Configuration
+
+WKT supports secure script execution through `.wkt.yaml` configuration. Scripts are predefined, use command allowlisting, and require confirmation before execution.
+
+#### Basic Script Configuration
+
+```yaml
+scripts:
+  # Security: Only these commands are allowed
+  allowed_commands:
+    - "pnpm"
+    - "npm"
+    - "docker"
+    - "planetscale"
+    - "./scripts/"    # Local scripts only
+
+  # Predefined scripts (safer than arbitrary commands)
+  scripts:
+    install-deps:
+      name: "Install Dependencies"
+      command: ["pnpm", "install"]
+      description: "Install npm dependencies"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 300000  # 5 minutes
+      
+    create-db-branch:
+      name: "Create Database Branch"
+      command: ["pscale", "branch", "create", "{{project_name}}", "{{branch_name}}"]
+      description: "Create PlanetScale database branch"
+      conditions:
+        file_exists: [".env.local"]
+      optional: true    # Won't fail workspace creation
+
+  # Scripts that run automatically
+  hooks:
+    post_create:
+      - script: "install-deps"
+      - script: "create-db-branch"
+        variables:
+          branch_name: "{{workspace_name}}"
+
+  # Convenient shortcuts
+  shortcuts:
+    i: "install-deps"
+    db: "create-db-branch"
+```
+
+#### Advanced Features
+
+**Workspace-Specific Scripts**: Different scripts based on branch patterns
+```yaml
+workspace_scripts:
+  "feature/*":
+    scripts:
+      dev-server:
+        command: ["pnpm", "run", "dev"]
+        background: true
+  "*staging*":
+    post_create:
+      - script: "setup-staging-env"
+```
+
+**Template Variables**: Dynamic values in script commands
+- `{{workspace_name}}` - Current workspace name
+- `{{branch_name}}` - Current branch name  
+- `{{project_name}}` - Current project name
+- `{{workspace_path}}` - Workspace directory path
+
+**Security Features**:
+- Command allowlisting prevents unauthorized execution
+- Confirmation prompts for all script execution (bypass with `--force`)
+- Workspace path restrictions prevent directory traversal
+- Timeout limits prevent runaway processes
+- Dry-run mode shows what would be executed (`--dry`)
+
+See [`.wkt.yaml.example`](.wkt.yaml.example) for comprehensive configuration examples.
 
 ## Branch Inference
 
@@ -347,6 +468,8 @@ local_files:
 - Workspace switching (`wkt switch`) 
 - Workspace listing (`wkt list`)
 - **Interactive cleanup command (`wkt clean`)** - Enhanced merge detection, interactive selection, and local branch protection
+- **Script execution (`wkt exec` / `wkt run`)** - Secure command execution with allowlisting, confirmation, and hooks
+- **Post-creation automation** - Automatic script execution after workspace creation
 - Sync command (`wkt sync`)
 - Configuration management (`wkt config`)
 - Branch name inference
@@ -356,10 +479,11 @@ local_files:
 ### 💭 Future Ideas
 - Status command (`wkt status`) - show git status across workspaces
 - Project management (`wkt project`) - manage multiple projects
-- Execute in workspace (`wkt exec`) - run commands in specific workspaces
 - Zsh completions
 - Workspace templates
 - SQLite database (currently using JSON)
+- Pre/post switch hooks
+- Script scheduling and background job management
 
 ## Testing
 

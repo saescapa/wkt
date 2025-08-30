@@ -9,6 +9,8 @@ import { listCommand } from './commands/list.js';
 import { cleanCommand } from './commands/clean.js';
 import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
+import { execCommand } from './commands/exec.js';
+import { runCommand } from './commands/run.js';
 
 program
   .name('wkt')
@@ -83,6 +85,30 @@ program
   .option('--force', 'Skip confirmation prompts')
   .option('--dry', 'Show what would be synced (dry run)')
   .action(syncCommand);
+
+program
+  .command('exec')
+  .description('Execute a command in a specific workspace')
+  .argument('<workspace>', 'Workspace identifier (project/workspace or workspace). Use "." for current workspace')
+  .argument('<command...>', 'Command to execute')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--dry', 'Show what would be executed (dry run)')
+  .option('--timeout <ms>', 'Command timeout in milliseconds', '120000')
+  .action((workspace, command, options) => {
+    execCommand(workspace, command, options);
+  });
+
+program
+  .command('run')
+  .description('Run a predefined script in a workspace')
+  .argument('<script-name>', 'Name of the script to run (or "list" to show available scripts)')
+  .argument('[workspace]', 'Workspace identifier (optional, uses current workspace if not specified). Use "." for current workspace')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--dry', 'Show what would be executed (dry run)')
+  .option('--timeout <ms>', 'Script timeout in milliseconds')
+  .action((scriptName, workspace, options) => {
+    runCommand(scriptName, workspace, options);
+  });
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));

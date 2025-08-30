@@ -1,7 +1,9 @@
-# Workspace Hooks Requirements
+# Workspace Hooks - ✅ IMPLEMENTED
 
 ## Overview
-WKT should support repo-specific automation through configurable hooks that run at different lifecycle events. This allows each repository to define its own build processes, dependency management, and setup routines while WKT orchestrates the execution.
+WKT supports repo-specific automation through configurable hooks that run at different lifecycle events. This allows each repository to define its own build processes, dependency management, and setup routines while WKT orchestrates the execution.
+
+**Status**: ✅ **FULLY IMPLEMENTED** as of script execution feature implementation.
 
 ## Requirements
 
@@ -12,34 +14,65 @@ WKT should support repo-specific automation through configurable hooks that run 
 - Fallback to global configuration in `~/.wkt/config.yaml`
 - YAML format for readability and comments support
 
-#### 1.2 Configuration Schema
+#### 1.2 Configuration Schema ✅ IMPLEMENTED
+
+**Current Implementation** (see `.wkt.yaml.example` for full examples):
+
 ```yaml
-hooks:
-  post_create:      # After workspace creation
-    - "pnpm install --frozen-lockfile"
-    - "pnpm build"
-  pre_switch:       # Before switching to workspace
-    - "pnpm install --prefer-offline"
-  post_switch:      # After switching to workspace
-    - "echo 'Switched to {{workspace_name}}'"
-  pre_clean:        # Before cleaning workspace
-    - "pnpm store prune"
+scripts:
+  # Security allowlist - only these commands can be executed
+  allowed_commands:
+    - "pnpm"
+    - "npm"
+    - "docker"
+    - "planetscale"
+    - "./scripts/"    # Local scripts only
 
-cache:
-  directories:      # Directories that contain cached data
-    - "node_modules"
-    - "dist"
-    - ".next/cache"
-    - "target"      # Rust
-  commands:
-    install: "pnpm install"
-    build: "pnpm build"
-    dev: "pnpm dev"
-    test: "pnpm test"
+  # Predefined scripts (safer than direct command strings)
+  scripts:
+    install-deps:
+      name: "Install Dependencies"
+      command: ["pnpm", "install", "--frozen-lockfile"]
+      description: "Install npm dependencies"
+      conditions:
+        file_exists: ["package.json"]
+      timeout: 300000  # 5 minutes
+      
+    build-project:
+      name: "Build Project"
+      command: ["pnpm", "build"]
+      conditions:
+        file_exists: ["package.json"]
 
-workspace:
-  auto_setup: true          # Run post_create hooks automatically
-  parallel_hooks: false     # Run hooks sequentially by default
+  # Hooks that run automatically ✅ IMPLEMENTED
+  hooks:
+    post_create:      # ✅ After workspace creation - WORKING
+      - script: "install-deps"
+      - script: "build-project"
+        conditions:
+          file_missing: ["dist/"]
+    # pre_switch:     # 🔄 Planned for future
+    # post_switch:    # 🔄 Planned for future
+
+  # Convenient shortcuts
+  shortcuts:
+    i: "install-deps"
+    build: "build-project"
+
+  # Workspace-specific script overrides ✅ IMPLEMENTED
+  workspace_scripts:
+    "feature/*":
+      post_create:
+        - script: "install-deps"
+        - script: "setup-dev-env"
+```
+
+**Key Implementation Notes**:
+- ✅ **Security-first**: Command allowlisting prevents malicious execution
+- ✅ **Confirmation prompts**: Always asks before running (bypass with `--force`)
+- ✅ **Template variables**: `{{workspace_name}}`, `{{branch_name}}`, etc.
+- ✅ **Conditional execution**: Run scripts only when conditions are met
+- ✅ **Error handling**: Optional scripts won't fail workspace creation
   timeout: 300              # Hook timeout in seconds
   ignore_errors: false     # Fail fast on hook errors
 ```

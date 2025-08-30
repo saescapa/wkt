@@ -51,6 +51,7 @@ export interface ProjectConfig {
     templates?: Record<string, string | TemplateConfig>;  // target -> source or config
     workspace_templates?: Record<string, Record<string, string | TemplateConfig>>; // workspace-specific overrides
   };
+  scripts?: ScriptConfig;     // Script execution configuration
 }
 
 export interface InferencePattern {
@@ -84,6 +85,7 @@ export interface GlobalConfig {
     templates: Record<string, string | TemplateConfig>;
     workspace_templates: Record<string, Record<string, string | TemplateConfig>>;
   };
+  scripts: ScriptConfig;      // Global script configuration
   projects: Record<string, ProjectConfig>;
   aliases: Record<string, string>;
 }
@@ -125,4 +127,63 @@ export interface CommandOptions {
   olderThan?: string;
   list?: boolean;
   pathOnly?: boolean;
+  // Script execution options
+  dry?: boolean;
+  confirm?: boolean;
+  background?: boolean;
+  timeout?: number;
+}
+
+// Safe script execution types
+export interface ScriptDefinition {
+  name: string;
+  command: string[];           // Array of command parts (safer than string)
+  description?: string;
+  working_dir?: string;        // Relative to workspace root
+  env?: Record<string, string>;
+  timeout?: number;            // milliseconds
+  background?: boolean;
+  optional?: boolean;          // If true, failure won't stop execution
+  conditions?: {
+    file_exists?: string[];    // Only run if these files exist
+    file_missing?: string[];   // Only run if these files don't exist
+    branch_pattern?: string;   // Regex pattern for branch names
+    workspace_pattern?: string; // Regex pattern for workspace names
+  };
+}
+
+export interface ScriptHook {
+  script: string;              // Reference to predefined script
+  args?: string[];             // Arguments to pass to script
+  variables?: Record<string, string>; // Template variables
+  conditions?: {
+    file_exists?: string[];
+    file_missing?: string[];
+    branch_pattern?: string;
+    workspace_pattern?: string;
+  };
+}
+
+export interface ScriptConfig {
+  // Predefined safe scripts
+  scripts?: Record<string, ScriptDefinition>;
+  
+  // Allowed commands (security allowlist)
+  allowed_commands?: string[];
+  
+  // Hooks that run automatically
+  hooks?: {
+    post_create?: ScriptHook[];
+    pre_switch?: ScriptHook[];
+    post_switch?: ScriptHook[];
+  };
+  
+  // Named script shortcuts
+  shortcuts?: Record<string, string>; // shortcut -> script name
+  
+  // Workspace-specific overrides
+  workspace_scripts?: Record<string, {
+    post_create?: ScriptHook[];
+    scripts?: Record<string, ScriptDefinition>;
+  }>;
 }
