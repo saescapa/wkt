@@ -8,54 +8,53 @@ import { GitUtils } from '../utils/git.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
+import { 
+  ErrorHandler, 
+  ProjectNotFoundError, 
+  WorkspaceExistsError, 
+  DirectoryExistsError
+} from '../utils/errors.js';
 
 export async function createCommand(
   projectName: string,
   branchName: string,
   options: CommandOptions = {}
 ): Promise<void> {
-  const configManager = new ConfigManager();
-  const dbManager = new DatabaseManager();
-  const localFilesManager = new LocalFilesManager();
-
-  const project = dbManager.getProject(projectName);
-  if (!project) {
-    console.error(chalk.red(`Error: Project '${projectName}' not found.`));
-    console.log('Use `wkt init --list` to see available projects.');
-    console.log(`Or initialize it with: wkt init <repository-url> ${projectName}`);
-    process.exit(1);
-  }
-
-  const config = configManager.getConfig();
-  const projectConfig = configManager.getProjectConfig(projectName);
-
-  const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
-  const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
-
-  const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
-  const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
-
-  const workspaceId = BranchInference.generateWorkspaceId(projectName, workspaceName);
-
-  if (dbManager.getWorkspace(workspaceId) && !options.force) {
-    console.error(chalk.red(`Error: Workspace '${workspaceName}' already exists in project '${projectName}'.`));
-    console.log('Use --force to overwrite the existing workspace.');
-    process.exit(1);
-  }
-
-  const workspacePath = join(project.workspacesPath, workspaceName);
-
-  if (existsSync(workspacePath) && !options.force) {
-    console.error(chalk.red(`Error: Directory '${workspacePath}' already exists.`));
-    console.log('Use --force to overwrite the existing directory.');
-    process.exit(1);
-  }
-
-  console.log(chalk.blue(`Creating workspace '${workspaceName}' for project '${projectName}'...`));
-  console.log(chalk.gray(`Branch: ${inferredBranchName}`));
-  console.log(chalk.gray(`Base: ${options.from || project.defaultBranch}`));
-
   try {
+    const configManager = new ConfigManager();
+    const dbManager = new DatabaseManager();
+    const localFilesManager = new LocalFilesManager();
+
+    const project = dbManager.getProject(projectName);
+    if (!project) {
+      throw new ProjectNotFoundError(projectName);
+    }
+
+    const config = configManager.getConfig();
+    const projectConfig = configManager.getProjectConfig(projectName);
+
+    const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
+    const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
+
+    const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
+    const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+
+    const workspaceId = BranchInference.generateWorkspaceId(projectName, workspaceName);
+
+    if (dbManager.getWorkspace(workspaceId) && !options.force) {
+      throw new WorkspaceExistsError(workspaceName, projectName);
+    }
+
+    const workspacePath = join(project.workspacesPath, workspaceName);
+
+    if (existsSync(workspacePath) && !options.force) {
+      throw new DirectoryExistsError(workspacePath);
+    }
+
+    console.log(chalk.blue(`Creating workspace '${workspaceName}' for project '${projectName}'...`));
+    console.log(chalk.gray(`Branch: ${inferredBranchName}`));
+    console.log(chalk.gray(`Base: ${options.from || project.defaultBranch}`));
+
     if (!existsSync(project.workspacesPath)) {
       mkdirSync(project.workspacesPath, { recursive: true });
     }
@@ -127,16 +126,29 @@ export async function createCommand(
     console.log(`  wkt list                                       # List all workspaces`);
 
   } catch (error) {
-    console.error(chalk.red(`Error creating workspace: ${error instanceof Error ? error.message : error}`));
-    
-    if (existsSync(workspacePath)) {
-      try {
-        await GitUtils.removeWorktree(project.bareRepoPath, workspacePath);
-      } catch {
-        // Ignore cleanup errors
+    // Cleanup on error - need to re-initialize managers for cleanup
+    try {
+      const cleanupDbManager = new DatabaseManager();
+      const cleanupConfigManager = new ConfigManager();
+      // Variables might not be defined if error occurred early
+      const project = cleanupDbManager.getProject(projectName);
+      if (project) {
+        const config = cleanupConfigManager.getConfig();
+        const projectConfig = cleanupConfigManager.getProjectConfig(projectName);
+        const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
+        const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
+        const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
+        const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+        const workspacePath = join(project.workspacesPath, workspaceName);
+        
+        if (existsSync(workspacePath)) {
+          await GitUtils.removeWorktree(project.bareRepoPath, workspacePath);
+        }
       }
+    } catch {
+      // Ignore cleanup errors
     }
     
-    process.exit(1);
+    ErrorHandler.handle(error, 'workspace creation');
   }
 }

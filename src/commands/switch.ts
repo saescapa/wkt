@@ -3,76 +3,73 @@ import inquirer from 'inquirer';
 import Fuse from 'fuse.js';
 import type { CommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
+import { ErrorHandler, WorkspaceNotFoundError } from '../utils/errors.js';
 
 export async function switchCommand(
   workspaceName?: string,
   options: CommandOptions = {}
 ): Promise<void> {
-  const dbManager = new DatabaseManager();
-
-  if (workspaceName === '-') {
-    const current = dbManager.getCurrentWorkspace();
-    if (!current) {
-      console.error(chalk.red('Error: No previous workspace found.'));
-      process.exit(1);
-    }
-    workspaceName = current.name;
-  }
-
-  let workspaces: Workspace[] = [];
-
-  if (options.project) {
-    workspaces = dbManager.getWorkspacesByProject(options.project);
-    if (workspaces.length === 0) {
-      console.error(chalk.red(`Error: No workspaces found for project '${options.project}'.`));
-      process.exit(1);
-    }
-  } else {
-    workspaces = dbManager.getAllWorkspaces();
-    if (workspaces.length === 0) {
-      console.error(chalk.red('Error: No workspaces found.'));
-      console.log('Create a workspace with: wkt create <project> <branch-name>');
-      process.exit(1);
-    }
-  }
-
-  let selectedWorkspace: Workspace | undefined;
-
-  if (!workspaceName || options.search) {
-    selectedWorkspace = await selectWorkspaceInteractively(workspaces, workspaceName, options.search);
-  } else {
-    const matches = findWorkspaceMatches(workspaces, workspaceName);
-
-    if (matches.length === 0) {
-      console.error(chalk.red(`Error: No workspace found matching '${workspaceName}'.`));
-      
-      if (options.create) {
-        console.log(chalk.blue('Use --create flag to create a new workspace.'));
-        // TODO: Implement create logic here
-        return;
-      }
-      
-      console.log('Available workspaces:');
-      workspaces.forEach(w => {
-        console.log(`  ${w.projectName}/${w.name}`);
-      });
-      process.exit(1);
-    }
-
-    if (matches.length === 1) {
-      selectedWorkspace = matches[0];
-    } else {
-      console.log(chalk.yellow(`Multiple workspaces found matching '${workspaceName}':`));
-      selectedWorkspace = await selectFromMultipleMatches(matches);
-    }
-  }
-
-  if (!selectedWorkspace) {
-    console.log(chalk.yellow('No workspace selected.'));
-    return;
-  }
-
   try {
+    const dbManager = new DatabaseManager();
+
+    if (workspaceName === '-') {
+      const current = dbManager.getCurrentWorkspace();
+      if (!current) {
+        throw new WorkspaceNotFoundError('previous workspace');
+      }
+      workspaceName = current.name;
+    }
+
+    let workspaces: Workspace[] = [];
+
+    if (options.project) {
+      workspaces = dbManager.getWorkspacesByProject(options.project);
+      if (workspaces.length === 0) {
+        throw new WorkspaceNotFoundError(`workspaces for project '${options.project}'`);
+      }
+    } else {
+      workspaces = dbManager.getAllWorkspaces();
+      if (workspaces.length === 0) {
+        throw new WorkspaceNotFoundError('any workspaces');
+      }
+    }
+
+    let selectedWorkspace: Workspace | undefined;
+
+    if (!workspaceName || options.search) {
+      selectedWorkspace = await selectWorkspaceInteractively(workspaces, workspaceName, options.search);
+    } else {
+      const matches = findWorkspaceMatches(workspaces, workspaceName);
+
+      if (matches.length === 0) {
+        console.error(chalk.red(`Error: No workspace found matching '${workspaceName}'.`));
+        
+        if (options.create) {
+          console.log(chalk.blue('Use --create flag to create a new workspace.'));
+          // TODO: Implement create logic here
+          return;
+        }
+        
+        console.log('Available workspaces:');
+        workspaces.forEach(w => {
+          console.log(`  ${w.projectName}/${w.name}`);
+        });
+        throw new WorkspaceNotFoundError(workspaceName);
+      }
+
+      if (matches.length === 1) {
+        selectedWorkspace = matches[0];
+      } else {
+        console.log(chalk.yellow(`Multiple workspaces found matching '${workspaceName}':`));
+        selectedWorkspace = await selectFromMultipleMatches(matches);
+      }
+    }
+
+    if (!selectedWorkspace) {
+      console.log(chalk.yellow('No workspace selected.'));
+      return;
+    }
+
     selectedWorkspace.lastUsed = new Date();
     dbManager.updateWorkspace(selectedWorkspace);
     dbManager.setCurrentWorkspace(selectedWorkspace.id);
@@ -91,8 +88,7 @@ export async function switchCommand(
     }
 
   } catch (error) {
-    console.error(chalk.red(`Error switching to workspace: ${error instanceof Error ? error.message : error}`));
-    process.exit(1);
+    ErrorHandler.handle(error, 'workspace switch');
   }
 }
 
