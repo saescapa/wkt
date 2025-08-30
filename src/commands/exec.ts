@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import inquirer from 'inquirer';
 import type { CommandOptions } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
@@ -92,8 +93,7 @@ export async function execCommand(
 
   // Confirm execution unless --force
   if (!options.force) {
-    const inquirer = await import('inquirer');
-    const { confirm } = await inquirer.default.prompt([{
+    const { confirm } = await inquirer.prompt([{
       type: 'confirm',
       name: 'confirm',
       message: `Execute "${command.join(' ')}" in ${workspace.projectName}/${workspace.name}?`,
@@ -107,7 +107,7 @@ export async function execCommand(
   }
 
   // Execute the command
-  const success = await (SafeScriptExecutor as any)['runScript'](adHocScript, context, options);
+  const success = await SafeScriptExecutor.runScript(adHocScript, context, options);
   
   if (!success) {
     process.exit(1);
@@ -134,7 +134,7 @@ function findWorkspace(
   projectName: string | undefined,
   workspaceName: string,
   dbManager: DatabaseManager
-) {
+): Workspace | null {
   const allWorkspaces = dbManager.getAllWorkspaces();
 
   // If project specified, look for exact match

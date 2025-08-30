@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
-import { join, resolve } from 'path';
+import { resolve } from 'path';
 import { existsSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
@@ -200,9 +200,11 @@ export class SafeScriptExecutor {
     for (const [pattern, config] of Object.entries(workspaceScriptConfig)) {
       if (this.matchesPattern(context.workspace.name, pattern) || 
           this.matchesPattern(context.workspace.branchName, pattern)) {
-        if ((config as any)[hookType]) {
-          hooks.push(...(config as any)[hookType]);
+        if (hookType === 'post_create' && config.post_create) {
+          hooks.push(...config.post_create);
         }
+        // Note: pre_switch and post_switch hooks not currently supported in workspace_scripts
+        // but we'll add proper type checking if/when they are
       }
     }
 
@@ -297,7 +299,7 @@ export class SafeScriptExecutor {
   /**
    * Run a script with safety checks
    */
-  private static async runScript(
+  static async runScript(
     script: ScriptDefinition,
     context: ExecutionContext,
     options: CommandOptions = {}

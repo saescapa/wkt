@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { CommandOptions } from '../core/types.js';
+import type { CommandOptions, Workspace, ScriptConfig, ScriptDefinition } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
@@ -107,7 +107,7 @@ function findWorkspace(
   projectName: string | undefined,
   workspaceName: string,
   dbManager: DatabaseManager
-) {
+): Workspace | null {
   const allWorkspaces = dbManager.getAllWorkspaces();
 
   // If project specified, look for exact match
@@ -121,32 +121,30 @@ function findWorkspace(
   return allWorkspaces.find(w => w.name === workspaceName) || null;
 }
 
-function listAvailableScripts(workspace: import('../core/types.js').Workspace, scriptConfig: import('../core/types.js').ScriptConfig): void {
+function listAvailableScripts(workspace: Workspace, scriptConfig: ScriptConfig): void {
   console.log(chalk.blue(`Available scripts for ${workspace.projectName}/${workspace.name}:\n`));
 
   // Global scripts
   if (scriptConfig.scripts) {
     console.log(chalk.green('Global scripts:'));
     for (const [name, script] of Object.entries(scriptConfig.scripts)) {
-      const s = script as any;
       console.log(`  ${chalk.bold(name)}`);
-      if (s.description) {
-        console.log(chalk.gray(`    ${s.description}`));
+      if (script.description) {
+        console.log(chalk.gray(`    ${script.description}`));
       } else {
-        console.log(chalk.gray(`    ${s.command?.join(' ') || 'No command defined'}`));
+        console.log(chalk.gray(`    ${script.command?.join(' ') || 'No command defined'}`));
       }
     }
     console.log();
   }
 
   // Workspace-specific scripts
-  const workspaceScripts: Record<string, any> = {};
+  const workspaceScripts: Record<string, ScriptDefinition> = {};
   if (scriptConfig.workspace_scripts) {
     for (const [pattern, config] of Object.entries(scriptConfig.workspace_scripts)) {
-      const configObj = config as any;
       if (matchesPattern(workspace.name, pattern) || matchesPattern(workspace.branchName, pattern)) {
-        if (configObj.scripts) {
-          Object.assign(workspaceScripts, configObj.scripts);
+        if (config.scripts) {
+          Object.assign(workspaceScripts, config.scripts);
         }
       }
     }
@@ -155,7 +153,7 @@ function listAvailableScripts(workspace: import('../core/types.js').Workspace, s
   if (Object.keys(workspaceScripts).length > 0) {
     console.log(chalk.green('Workspace-specific scripts:'));
     for (const [name, script] of Object.entries(workspaceScripts)) {
-      const s = script as import('../core/types.js').ScriptDefinition;
+      const s = script;
       console.log(`  ${chalk.bold(name)}`);
       if (s.description) {
         console.log(chalk.gray(`    ${s.description}`));

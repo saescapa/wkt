@@ -26,9 +26,9 @@ export function parseDuration(duration: string): number {
 }
 
 export class GitUtils {
-  static async executeCommand(command: string, cwd?: string): Promise<string> {
+  static async executeCommand(command: string[], cwd?: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const [cmd, ...args] = command.split(' ');
+      const [cmd, ...args] = command;
       if (!cmd) {
         reject(new Error('Invalid command'));
         return;
@@ -36,7 +36,7 @@ export class GitUtils {
       const process = spawn(cmd, args, { 
         cwd: cwd || undefined, 
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true 
+        shell: false 
       });
 
       let stdout = '';
@@ -54,7 +54,7 @@ export class GitUtils {
         if (code === 0) {
           resolve(stdout.trim());
         } else {
-          reject(new Error(`Command failed: ${command}\n${stderr}`));
+          reject(new Error(`Command failed: ${command.join(' ')}\n${stderr}`));
         }
       });
     });
@@ -66,7 +66,7 @@ export class GitUtils {
 
   static async getBareRepoUrl(repoPath: string): Promise<string> {
     try {
-      const result = await this.executeCommand('git remote get-url origin', repoPath);
+      const result = await this.executeCommand(['git', 'remote', 'get-url', 'origin'], repoPath);
       return result.trim();
     } catch {
       throw new Error('Failed to get repository URL');
@@ -75,7 +75,7 @@ export class GitUtils {
 
   static async getCurrentBranch(workspacePath: string): Promise<string> {
     try {
-      const result = await this.executeCommand('git branch --show-current', workspacePath);
+      const result = await this.executeCommand(['git', 'branch', '--show-current'], workspacePath);
       return result.trim();
     } catch {
       return 'HEAD';
@@ -84,7 +84,7 @@ export class GitUtils {
 
   static async getWorkspaceStatus(workspacePath: string): Promise<WorkspaceStatus> {
     try {
-      const result = await this.executeCommand('git status --porcelain', workspacePath);
+      const result = await this.executeCommand(['git', 'status', '--porcelain'], workspacePath);
       const lines = result.split('\n').filter(line => line.trim());
 
       let staged = 0;
@@ -131,12 +131,12 @@ export class GitUtils {
       const currentBranch = await this.getCurrentBranch(workspacePath);
       
       const aheadResult = await this.executeCommand(
-        `git rev-list --count ${baseBranch}..${currentBranch}`,
+        ['git', 'rev-list', '--count', `${baseBranch}..${currentBranch}`],
         workspacePath
       );
       
       const behindResult = await this.executeCommand(
-        `git rev-list --count ${currentBranch}..${baseBranch}`,
+        ['git', 'rev-list', '--count', `${currentBranch}..${baseBranch}`],
         workspacePath
       );
 
@@ -150,16 +150,16 @@ export class GitUtils {
   }
 
   static async cloneBareRepository(repoUrl: string, targetPath: string): Promise<void> {
-    await this.executeCommand(`git clone --bare "${repoUrl}" "${targetPath}"`);
+    await this.executeCommand(['git', 'clone', '--bare', repoUrl, targetPath]);
     
     // Check if origin remote already exists (git clone --bare creates it automatically)
     try {
-      await this.executeCommand('git remote get-url origin', targetPath);
+      await this.executeCommand(['git', 'remote', 'get-url', 'origin'], targetPath);
       // Origin exists, update it to ensure it matches
-      await this.executeCommand(`git remote set-url origin "${repoUrl}"`, targetPath);
+      await this.executeCommand(['git', 'remote', 'set-url', 'origin', repoUrl], targetPath);
     } catch {
       // Origin doesn't exist, add it
-      await this.executeCommand(`git remote add origin "${repoUrl}"`, targetPath);
+      await this.executeCommand(['git', 'remote', 'add', 'origin', repoUrl], targetPath);
     }
   }
 
@@ -167,23 +167,23 @@ export class GitUtils {
     const branchExists = await this.branchExists(bareRepoPath, branchName);
     
     if (baseBranch && !branchExists) {
-      await this.executeCommand(`git worktree add "${workspacePath}" -b "${branchName}" "${baseBranch}"`, bareRepoPath);
+      await this.executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, baseBranch], bareRepoPath);
     } else {
-      await this.executeCommand(`git worktree add "${workspacePath}" "${branchName}"`, bareRepoPath);
+      await this.executeCommand(['git', 'worktree', 'add', workspacePath, branchName], bareRepoPath);
     }
 
     // Ensure origin remote is properly configured in the worktree
     try {
-      const originUrl = await this.executeCommand('git remote get-url origin', bareRepoPath);
+      const originUrl = await this.executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
       
       // Check if origin already exists in worktree
       try {
-        await this.executeCommand('git remote get-url origin', workspacePath);
+        await this.executeCommand(['git', 'remote', 'get-url', 'origin'], workspacePath);
         // Origin exists, update it to match bare repo
-        await this.executeCommand(`git remote set-url origin "${originUrl}"`, workspacePath);
+        await this.executeCommand(['git', 'remote', 'set-url', 'origin', originUrl], workspacePath);
       } catch {
         // Origin doesn't exist, add it
-        await this.executeCommand(`git remote add origin "${originUrl}"`, workspacePath);
+        await this.executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
       }
     } catch (error) {
       console.warn('Warning: Could not configure origin remote in worktree');
@@ -192,11 +192,11 @@ export class GitUtils {
 
   static async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
     try {
-      await this.executeCommand(`git show-ref --verify --quiet refs/heads/${branchName}`, bareRepoPath);
+      await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], bareRepoPath);
       return true;
     } catch {
       try {
-        await this.executeCommand(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, bareRepoPath);
+        await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${branchName}`], bareRepoPath);
         return true;
       } catch {
         return false;
@@ -205,12 +205,12 @@ export class GitUtils {
   }
 
   static async removeWorktree(bareRepoPath: string, workspacePath: string): Promise<void> {
-    await this.executeCommand(`git worktree remove "${workspacePath}" --force`, bareRepoPath);
+    await this.executeCommand(['git', 'worktree', 'remove', workspacePath, '--force'], bareRepoPath);
   }
 
   static async listWorktrees(bareRepoPath: string): Promise<Array<{ path: string; branch: string; hash: string }>> {
     try {
-      const result = await this.executeCommand('git worktree list --porcelain', bareRepoPath);
+      const result = await this.executeCommand(['git', 'worktree', 'list', '--porcelain'], bareRepoPath);
       const lines = result.split('\n');
       const worktrees: Array<{ path: string; branch: string; hash: string }> = [];
       
@@ -242,21 +242,21 @@ export class GitUtils {
   }
 
   static async fetchAll(bareRepoPath: string): Promise<void> {
-    await this.executeCommand('git fetch --all', bareRepoPath);
+    await this.executeCommand(['git', 'fetch', '--all'], bareRepoPath);
   }
 
   static async fetchInWorkspace(workspacePath: string): Promise<void> {
     // Fetch in the workspace - this updates the shared repository refs
-    await this.executeCommand('git fetch origin', workspacePath);
+    await this.executeCommand(['git', 'fetch', 'origin'], workspacePath);
   }
 
   static async getDefaultBranch(bareRepoPath: string): Promise<string> {
     try {
-      const result = await this.executeCommand('git symbolic-ref refs/remotes/origin/HEAD', bareRepoPath);
+      const result = await this.executeCommand(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'], bareRepoPath);
       return result.replace('refs/remotes/origin/', '').trim();
     } catch {
       try {
-        const result = await this.executeCommand('git branch -r', bareRepoPath);
+        const result = await this.executeCommand(['git', 'branch', '-r'], bareRepoPath);
         const branches = result.split('\n').map(b => b.trim());
         
         if (branches.find(b => b.includes('origin/main'))) return 'main';
@@ -271,16 +271,19 @@ export class GitUtils {
   }
 
   static async rebaseBranch(workspacePath: string, baseBranch: string): Promise<void> {
-    await this.executeCommand(`git rebase origin/${baseBranch}`, workspacePath);
+    await this.executeCommand(['git', 'rebase', `origin/${baseBranch}`], workspacePath);
   }
 
   static async pullWithRebase(workspacePath: string): Promise<void> {
-    await this.executeCommand('git pull --rebase', workspacePath);
+    await this.executeCommand(['git', 'pull', '--rebase'], workspacePath);
   }
 
   static async pushBranch(workspacePath: string, branchName: string, force: boolean = false): Promise<void> {
-    const forceFlag = force ? '--force-with-lease' : '';
-    await this.executeCommand(`git push origin ${branchName} ${forceFlag}`.trim(), workspacePath);
+    const args = ['git', 'push', 'origin', branchName];
+    if (force) {
+      args.push('--force-with-lease');
+    }
+    await this.executeCommand(args, workspacePath);
   }
 
   static async isWorkingTreeClean(workspacePath: string): Promise<boolean> {
@@ -291,7 +294,7 @@ export class GitUtils {
   static async isBranchMerged(bareRepoPath: string, branchName: string, baseBranch: string = 'main'): Promise<boolean> {
     try {
       // Method 1: Check if branch is merged using traditional git branch --merged
-      const result = await this.executeCommand(`git branch --merged ${baseBranch}`, bareRepoPath);
+      const result = await this.executeCommand(['git', 'branch', '--merged', baseBranch], bareRepoPath);
       const mergedBranches = result.split('\n')
         .map(line => line.trim().replace(/^\*\s*/, ''))
         .filter(line => line.length > 0);
@@ -311,7 +314,7 @@ export class GitUtils {
       
       for (const term of searchTerms) {
         const mergeCommits = await this.executeCommand(
-          `git log --oneline --all --grep="${term}" origin/${baseBranch} | head -5`,
+          ['git', 'log', '--oneline', '--all', `--grep=${term}`, `origin/${baseBranch}`, '-n', '5'],
           bareRepoPath
         );
         
@@ -320,11 +323,18 @@ export class GitUtils {
         }
       }
 
-      // Method 2b: Check for recent PR merges and match against branch patterns
-      const prNumberSearch = await this.executeCommand(
-        `git log --oneline origin/${baseBranch} --since="30 days ago" | grep "(#[0-9]"`,
-        bareRepoPath
-      );
+      // Method 2b: Check for recent PR merges and match against branch patterns  
+      let prNumberSearch = '';
+      try {
+        const logResult = await this.executeCommand(
+          ['git', 'log', '--oneline', `origin/${baseBranch}`, '--since=30 days ago'],
+          bareRepoPath
+        );
+        // Filter lines that contain PR numbers
+        prNumberSearch = logResult.split('\n').filter(line => line.includes('(#')).join('\n');
+      } catch {
+        prNumberSearch = '';
+      }
       
       if (prNumberSearch.trim().length > 0 && branchParts.length > 1) {
         // For misc branches like "misc/w34-2", check if there are recent "miscellaneous" commits
@@ -356,7 +366,7 @@ export class GitUtils {
 
       // Method 3: Check if branch exists on remote (if not, it might have been deleted after merge)
       try {
-        await this.executeCommand(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, bareRepoPath);
+        await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${branchName}`], bareRepoPath);
         // Branch still exists on remote, so probably not merged
         return false;
       } catch {
@@ -364,7 +374,7 @@ export class GitUtils {
         // Check git reflog or recent fetch logs to see if this branch was ever tracked
         try {
           // Check if we have any record of this branch being on remote
-          const reflogCheck = await this.executeCommand(`git reflog --all --grep="origin/${branchName}" | head -1`, bareRepoPath);
+          const reflogCheck = await this.executeCommand(['git', 'reflog', '--all', `--grep=origin/${branchName}`, '-n', '1'], bareRepoPath);
           if (reflogCheck.trim().length === 0) {
             // No evidence this branch was ever on remote - it's local-only, don't clean
             return false;
@@ -376,7 +386,7 @@ export class GitUtils {
         
         // Branch was on remote but now deleted - check if it was likely merged
         const recentCommits = await this.executeCommand(
-          `git log --oneline origin/${baseBranch} --since="30 days ago" | head -50`,
+          ['git', 'log', '--oneline', `origin/${baseBranch}`, '--since=30 days ago', '-n', '50'],
           bareRepoPath
         );
         
@@ -392,7 +402,7 @@ export class GitUtils {
   static async getBranchAge(bareRepoPath: string, branchName: string): Promise<Date | null> {
     try {
       // Get the date of the last commit on the branch
-      const result = await this.executeCommand(`git log -1 --format=%ct ${branchName}`, bareRepoPath);
+      const result = await this.executeCommand(['git', 'log', '-1', '--format=%ct', branchName], bareRepoPath);
       const timestamp = parseInt(result.trim(), 10);
       
       if (isNaN(timestamp)) {

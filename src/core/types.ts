@@ -110,12 +110,70 @@ export interface WKTDatabase {
   };
 }
 
-export interface CommandOptions {
+// Base interface for common options
+export interface BaseCommandOptions {
+  force?: boolean;
+  dry?: boolean;
+}
+
+// Command-specific option interfaces
+export interface CreateCommandOptions extends BaseCommandOptions {
   from?: string;
   name?: string;
   template?: string;
   checkout?: boolean;
-  force?: boolean;
+}
+
+export interface SwitchCommandOptions extends BaseCommandOptions {
+  search?: boolean;
+  project?: string;
+  create?: boolean;
+  pathOnly?: boolean;
+}
+
+export interface ListCommandOptions {
+  project?: string;
+  details?: boolean;
+  filter?: string;
+  groupBy?: string;
+}
+
+export interface CleanCommandOptions extends BaseCommandOptions {
+  project?: string;
+  all?: boolean;
+  merged?: boolean;
+  olderThan?: string;
+}
+
+export interface ConfigCommandOptions {
+  project?: string;
+  global?: boolean;
+}
+
+export interface SyncCommandOptions extends BaseCommandOptions {
+  project?: string;
+  workspace?: string;
+  all?: boolean;
+}
+
+export interface ExecCommandOptions extends BaseCommandOptions {
+  timeout?: number;
+}
+
+export interface RunCommandOptions extends BaseCommandOptions {
+  timeout?: number;
+}
+
+export interface InitCommandOptions {
+  list?: boolean;
+}
+
+// Legacy interface for backward compatibility - will be deprecated
+export interface CommandOptions extends BaseCommandOptions {
+  from?: string;
+  name?: string;
+  template?: string;
+  checkout?: boolean;
   search?: boolean;
   project?: string;
   create?: boolean;
@@ -128,10 +186,11 @@ export interface CommandOptions {
   list?: boolean;
   pathOnly?: boolean;
   // Script execution options
-  dry?: boolean;
   confirm?: boolean;
   background?: boolean;
   timeout?: number;
+  workspace?: string;
+  global?: boolean;
 }
 
 // Safe script execution types

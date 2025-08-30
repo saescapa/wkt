@@ -1,4 +1,4 @@
-import { existsSync, symlinkSync, copyFileSync, readFileSync, writeFileSync, lstatSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { existsSync, symlinkSync, copyFileSync, readFileSync, writeFileSync, lstatSync, mkdirSync, readdirSync, statSync, unlinkSync, readlinkSync } from 'fs';
 import { join, dirname, relative, resolve } from 'path';
 import chalk from 'chalk';
 import type { Project, ProjectConfig, TemplateConfig, GlobalConfig } from '../core/types.js';
@@ -104,8 +104,7 @@ export class LocalFilesManager {
       if (stats.isSymbolicLink()) {
         // Already a symlink, check if it points to the right place
         try {
-          const fs = await import('fs/promises');
-          const linkTarget = await fs.readlink(targetFile);
+          const linkTarget = readlinkSync(targetFile);
           const currentTarget = resolve(dirname(targetFile), linkTarget);
           if (currentTarget === resolve(sourceFile)) {
             return; // Already correctly symlinked
@@ -116,8 +115,7 @@ export class LocalFilesManager {
       }
       // Remove existing file/symlink
       try {
-        const fs = await import('fs/promises');
-        await fs.unlink(targetFile);
+        unlinkSync(targetFile);
       } catch (error) {
         console.log(chalk.yellow(`Warning: Could not remove existing file ${filePath}: ${error}`));
         return;
