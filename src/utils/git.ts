@@ -165,17 +165,51 @@ export class GitUtils {
 
   static async createWorktree(bareRepoPath: string, workspacePath: string, branchName: string, baseBranch?: string): Promise<void> {
     const branchExists = await this.branchExists(bareRepoPath, branchName);
-    
-    if (baseBranch && !branchExists) {
-      await this.executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, baseBranch], bareRepoPath);
-    } else {
-      await this.executeCommand(['git', 'worktree', 'add', workspacePath, branchName], bareRepoPath);
+
+    try {
+      if (baseBranch && !branchExists) {
+        await this.executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, baseBranch], bareRepoPath);
+      } else {
+        await this.executeCommand(['git', 'worktree', 'add', workspacePath, branchName], bareRepoPath);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Handle empty repository case - create orphan branch
+      if (errorMessage.includes('not a valid object name') ||
+          errorMessage.includes('fatal: not a valid object name') ||
+          errorMessage.includes('invalid reference: HEAD')) {
+        // This is an empty repository, we need to create the initial structure differently
+
+        // Create directory
+        await this.executeCommand(['mkdir', '-p', workspacePath], undefined);
+
+        // Clone the bare repo into the workspace to establish the connection
+        const originUrl = await this.executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
+        await this.executeCommand(['git', 'clone', originUrl, workspacePath], undefined);
+
+        // Remove the cloned workspace and recreate it properly
+        await this.executeCommand(['rm', '-rf', workspacePath], undefined);
+
+        // Create worktree directory and initialize as orphan
+        await this.executeCommand(['mkdir', '-p', workspacePath], undefined);
+        await this.executeCommand(['git', 'init'], workspacePath);
+        await this.executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
+        await this.executeCommand(['git', 'checkout', '--orphan', branchName], workspacePath);
+        await this.executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+
+        // Push the branch to establish it in the bare repo
+        await this.executeCommand(['git', 'push', '-u', 'origin', branchName], workspacePath);
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
     }
 
     // Ensure origin remote is properly configured in the worktree
     try {
       const originUrl = await this.executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
-      
+
       // Check if origin already exists in worktree
       try {
         await this.executeCommand(['git', 'remote', 'get-url', 'origin'], workspacePath);
@@ -242,7 +276,19 @@ export class GitUtils {
   }
 
   static async fetchAll(bareRepoPath: string): Promise<void> {
-    await this.executeCommand(['git', 'fetch', '--all'], bareRepoPath);
+    try {
+      await this.executeCommand(['git', 'fetch', '--all'], bareRepoPath);
+    } catch (error) {
+      // Handle empty repositories gracefully - they have no refs to fetch
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("couldn't find remote ref HEAD") ||
+          errorMessage.includes("fatal: Couldn't find remote ref")) {
+        // This is an empty repository, which is acceptable
+        return;
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   static async fetchInWorkspace(workspacePath: string): Promise<void> {
@@ -257,14 +303,21 @@ export class GitUtils {
     } catch {
       try {
         const result = await this.executeCommand(['git', 'branch', '-r'], bareRepoPath);
-        const branches = result.split('\n').map(b => b.trim());
-        
+        const branches = result.split('\n').map(b => b.trim()).filter(b => b.length > 0);
+
         if (branches.find(b => b.includes('origin/main'))) return 'main';
         if (branches.find(b => b.includes('origin/master'))) return 'master';
-        
+
         const firstBranch = branches.find(b => b.startsWith('origin/') && !b.includes('HEAD'));
-        return firstBranch ? firstBranch.replace('origin/', '') : 'main';
+        if (firstBranch) {
+          return firstBranch.replace('origin/', '');
+        }
+
+        // No remote branches found - this is likely an empty repository
+        // Default to 'main' as it's the modern Git standard
+        return 'main';
       } catch {
+        // If all else fails, default to 'main'
         return 'main';
       }
     }
