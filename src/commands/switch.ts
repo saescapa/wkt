@@ -60,8 +60,48 @@ export async function switchCommand(
       if (matches.length === 1) {
         selectedWorkspace = matches[0];
       } else {
-        console.log(chalk.yellow(`Multiple workspaces found matching '${workspaceName}':`));
-        selectedWorkspace = await selectFromMultipleMatches(matches);
+        // Handle multiple matches - if --path-only, try to be smart about selection
+        if (options.pathOnly) {
+          // For path-only mode (used by shell functions), implement cycling behavior
+          const currentWorkspace = dbManager.getCurrentWorkspace();
+
+          if (currentWorkspace && matches.find(w => w.id === currentWorkspace.id)) {
+            // Current workspace is one of the matches - cycle to the next one
+            const sortedMatches = matches.sort((a, b) => {
+              // Sort by project name first, then by name for consistent ordering
+              if (a.projectName !== b.projectName) {
+                return a.projectName.localeCompare(b.projectName);
+              }
+              return a.name.localeCompare(b.name);
+            });
+
+            const currentIndex = sortedMatches.findIndex(w => w.id === currentWorkspace.id);
+            const nextIndex = (currentIndex + 1) % sortedMatches.length;
+            selectedWorkspace = sortedMatches[nextIndex];
+          } else {
+            // Not currently in one of the matches - prefer current project, then most recent
+            if (currentWorkspace) {
+              const currentProjectMatch = matches.find(w => w.projectName === currentWorkspace.projectName);
+              if (currentProjectMatch) {
+                selectedWorkspace = currentProjectMatch;
+              } else {
+                // No current project match, use most recently used
+                selectedWorkspace = matches.sort((a, b) =>
+                  new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
+                )[0];
+              }
+            } else {
+              // No current workspace, use most recently used
+              selectedWorkspace = matches.sort((a, b) =>
+                new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
+              )[0];
+            }
+          }
+        } else {
+          // Interactive mode for normal usage
+          console.log(chalk.yellow(`Multiple workspaces found matching '${workspaceName}':`));
+          selectedWorkspace = await selectFromMultipleMatches(matches);
+        }
       }
     }
 
