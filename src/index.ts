@@ -101,7 +101,7 @@ program
 program
   .command('run')
   .description('Run a predefined script in a workspace')
-  .argument('<script-name>', 'Name of the script to run (or "list" to show available scripts)')
+  .argument('[script-name]', 'Name of the script to run (or "list" to show available scripts). If not provided, shows interactive selection')
   .argument('[workspace]', 'Workspace identifier (optional, uses current workspace if not specified). Use "." for current workspace')
   .option('--force', 'Skip confirmation prompts')
   .option('--dry', 'Show what would be executed (dry run)')

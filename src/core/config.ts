@@ -107,6 +107,22 @@ export class ConfigManager {
     return globalConfig.projects[projectName] || {};
   }
 
+  getWorkspaceConfig(workspacePath: string): ProjectConfig {
+    const localConfigPath = join(workspacePath, '.wkt.yaml');
+
+    if (!existsSync(localConfigPath)) {
+      return {};
+    }
+
+    try {
+      const configContent = readFileSync(localConfigPath, 'utf-8');
+      return parse(configContent) as ProjectConfig;
+    } catch (error) {
+      console.warn(`Warning: Failed to parse ${localConfigPath}:`, error);
+      return {};
+    }
+  }
+
   updateProjectConfig(projectName: string, config: ProjectConfig): void {
     const globalConfig = this.getConfig();
     globalConfig.projects[projectName] = config;

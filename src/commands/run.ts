@@ -1,11 +1,12 @@
 import chalk from 'chalk';
+import inquirer from 'inquirer';
 import type { CommandOptions, Workspace, ScriptConfig, ScriptDefinition } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 
 export async function runCommand(
-  scriptName: string,
+  scriptName?: string,
   workspaceIdentifier?: string,
   options: CommandOptions = {}
 ): Promise<void> {
@@ -50,16 +51,16 @@ export async function runCommand(
     process.exit(1);
   }
 
-  // Get script configuration
+  // Get script configuration (merged from workspace, project, and global)
   const globalConfig = configManager.getConfig();
   const projectConfig = configManager.getProjectConfig(workspace.projectName);
-  const scriptConfig = projectConfig.scripts || globalConfig.scripts || {
-    scripts: {},
-    allowed_commands: [],
-    hooks: {},
-    shortcuts: {},
-    workspace_scripts: {},
-  };
+  const workspaceConfig = configManager.getWorkspaceConfig(workspace.path);
+
+  const scriptConfig = mergeScriptConfigs(
+    globalConfig.scripts,
+    projectConfig.scripts,
+    workspaceConfig.scripts
+  );
 
   if (!scriptConfig) {
     console.error(chalk.red('No script configuration found.'));
@@ -67,7 +68,17 @@ export async function runCommand(
     process.exit(1);
   }
 
-  // List available scripts if no script name provided or if script not found
+  // Handle no script name provided - show interactive selection
+  if (!scriptName) {
+    const selectedScript = await selectScriptInteractively(workspace, scriptConfig);
+    if (!selectedScript) {
+      console.log(chalk.yellow('Script selection cancelled'));
+      return;
+    }
+    scriptName = selectedScript;
+  }
+
+  // List available scripts if explicitly requested
   if (scriptName === '--list' || scriptName === 'list') {
     listAvailableScripts(workspace, scriptConfig);
     return;
@@ -124,9 +135,9 @@ function findWorkspace(
 function listAvailableScripts(workspace: Workspace, scriptConfig: ScriptConfig): void {
   console.log(chalk.blue(`Available scripts for ${workspace.projectName}/${workspace.name}:\n`));
 
-  // Global scripts
+  // All available scripts (merged from global, project, and workspace)
   if (scriptConfig.scripts) {
-    console.log(chalk.green('Global scripts:'));
+    console.log(chalk.green('Available scripts:'));
     for (const [name, script] of Object.entries(scriptConfig.scripts)) {
       console.log(`  ${chalk.bold(name)}`);
       if (script.description) {
@@ -184,7 +195,140 @@ function matchesPattern(text: string, pattern: string): boolean {
   const regexPattern = pattern
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
-  
+
   const regex = new RegExp(`^${regexPattern}$`);
   return regex.test(text);
+}
+
+async function selectScriptInteractively(workspace: Workspace, scriptConfig: ScriptConfig): Promise<string | null> {
+  const availableScripts: Array<{name: string, description: string, source: string}> = [];
+
+  // Collect all scripts (already merged by source priority)
+  if (scriptConfig.scripts) {
+    for (const [name, script] of Object.entries(scriptConfig.scripts)) {
+      availableScripts.push({
+        name,
+        description: script.description || script.command?.join(' ') || 'No description',
+        source: 'available'
+      });
+    }
+  }
+
+  // Collect workspace-specific scripts
+  if (scriptConfig.workspace_scripts) {
+    for (const [pattern, config] of Object.entries(scriptConfig.workspace_scripts)) {
+      if (matchesPattern(workspace.name, pattern) || matchesPattern(workspace.branchName, pattern)) {
+        if (config.scripts) {
+          for (const [name, script] of Object.entries(config.scripts)) {
+            // Don't duplicate if already exists in global
+            if (!availableScripts.find(s => s.name === name)) {
+              availableScripts.push({
+                name,
+                description: script.description || script.command?.join(' ') || 'No description',
+                source: 'workspace-specific'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Handle shortcuts
+  const shortcuts: Array<{name: string, description: string, source: string}> = [];
+  if (scriptConfig.shortcuts) {
+    for (const [shortcut, target] of Object.entries(scriptConfig.shortcuts)) {
+      shortcuts.push({
+        name: shortcut,
+        description: `Shortcut for "${target}"`,
+        source: 'shortcut'
+      });
+    }
+  }
+
+  if (availableScripts.length === 0 && shortcuts.length === 0) {
+    console.log(chalk.yellow('No scripts available in this workspace'));
+    console.log(chalk.gray('Add scripts to .wkt.yaml in your project root or global config'));
+    return null;
+  }
+
+  // Combine scripts and shortcuts for selection
+  const allOptions = [
+    ...availableScripts.map(script => ({
+      name: `${chalk.bold(script.name)} ${chalk.gray(`(${script.source})`)}`,
+      value: script.name,
+      short: script.name
+    })),
+    ...shortcuts.map(shortcut => ({
+      name: `${chalk.bold(shortcut.name)} ${chalk.cyan('→')} ${chalk.gray(shortcut.description)}`,
+      value: shortcut.name,
+      short: shortcut.name
+    }))
+  ];
+
+  console.log(chalk.blue(`Available scripts for ${workspace.projectName}/${workspace.name}:`));
+
+  const { selectedScript } = await inquirer.prompt([{
+    type: 'list',
+    name: 'selectedScript',
+    message: 'Select a script to run:',
+    choices: [
+      ...allOptions,
+      new inquirer.Separator(),
+      {
+        name: chalk.gray('Cancel'),
+        value: null
+      }
+    ],
+    pageSize: 15
+  }]);
+
+  return selectedScript;
+}
+
+function mergeScriptConfigs(
+  globalScripts?: any,
+  projectScripts?: any,
+  workspaceScripts?: any
+): ScriptConfig {
+  const defaultConfig = {
+    scripts: {},
+    allowed_commands: [],
+    hooks: {},
+    shortcuts: {},
+    workspace_scripts: {},
+  };
+
+  // Start with global config
+  const merged = { ...defaultConfig };
+  if (globalScripts) {
+    merged.scripts = { ...merged.scripts, ...globalScripts.scripts };
+    merged.allowed_commands = [...(merged.allowed_commands || []), ...(globalScripts.allowed_commands || [])];
+    merged.hooks = { ...merged.hooks, ...globalScripts.hooks };
+    merged.shortcuts = { ...merged.shortcuts, ...globalScripts.shortcuts };
+    merged.workspace_scripts = { ...merged.workspace_scripts, ...globalScripts.workspace_scripts };
+  }
+
+  // Merge project config
+  if (projectScripts) {
+    merged.scripts = { ...merged.scripts, ...projectScripts.scripts };
+    merged.allowed_commands = [...(merged.allowed_commands || []), ...(projectScripts.allowed_commands || [])];
+    merged.hooks = { ...merged.hooks, ...projectScripts.hooks };
+    merged.shortcuts = { ...merged.shortcuts, ...projectScripts.shortcuts };
+    merged.workspace_scripts = { ...merged.workspace_scripts, ...projectScripts.workspace_scripts };
+  }
+
+  // Merge workspace config (highest priority)
+  if (workspaceScripts) {
+    merged.scripts = { ...merged.scripts, ...workspaceScripts.scripts };
+    merged.allowed_commands = [...(merged.allowed_commands || []), ...(workspaceScripts.allowed_commands || [])];
+    merged.hooks = { ...merged.hooks, ...workspaceScripts.hooks };
+    merged.shortcuts = { ...merged.shortcuts, ...workspaceScripts.shortcuts };
+    merged.workspace_scripts = { ...merged.workspace_scripts, ...workspaceScripts.workspace_scripts };
+  }
+
+  // Remove duplicates from allowed_commands
+  merged.allowed_commands = [...new Set(merged.allowed_commands)];
+
+  return merged;
 }
