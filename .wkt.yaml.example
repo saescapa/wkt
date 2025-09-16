@@ -1,6 +1,11 @@
-# Example WKT project configuration  
-# Place this file as .wkt.yaml in your project root
+# Example WKT workspace configuration
+# Place this file as .wkt.yaml in your workspace directory
 # Comprehensive example showing local files management AND script execution
+#
+# Configuration Hierarchy (higher priority overrides lower):
+# 1. Workspace: .wkt.yaml in workspace directory (this file)
+# 2. Project: ~/.wkt/config.yaml projects section
+# 3. Global: ~/.wkt/config.yaml scripts section
 
 local_files:
   # Files that will be symlinked to the main worktree
@@ -91,11 +96,13 @@ inference:
       template: '{}'
 
 # Script execution configuration (SAFE)
+# These scripts will be merged with global and project-level scripts
+# Workspace-specific scripts have the highest priority
 scripts:
   # Security: Only allow these commands to be executed
   allowed_commands:
     - "pnpm"
-    - "npm" 
+    - "npm"
     - "yarn"
     - "bun"
     - "node"
@@ -105,11 +112,34 @@ scripts:
     - "planetscale"         # For database branch management
     - "pscale"             # PlanetScale CLI alternative name
     - "make"
+    - "jq"                 # For JSON manipulation
+    - "sh"                 # Shell commands
+    - "mv"                 # File operations
     - "./scripts/"         # Local scripts in scripts/ directory
     - "scripts/"           # Alternative path
 
-  # Predefined safe scripts
+  # Workspace-specific scripts (only available in this workspace)
   scripts:
+    workspace-setup:
+      name: "Workspace Setup"
+      command: ["sh", "-c", "echo 'Setting up workspace-specific configuration'"]
+      description: "Configure this specific workspace"
+      timeout: 60000  # 1 minute
+
+    theme-dark:
+      name: "Set Dark Theme"
+      command: ["sh", "-c", "jq '. + {\"workbench.colorTheme\": \"Dark Modern\"}' .vscode/settings.json > tmp.json && mv tmp.json .vscode/settings.json"]
+      description: "Set VS Code to Dark Modern theme"
+      conditions:
+        file_exists: [".vscode/settings.json"]
+
+    theme-light:
+      name: "Set Light Theme"
+      command: ["sh", "-c", "jq '. + {\"workbench.colorTheme\": \"Default Light Modern\"}' .vscode/settings.json > tmp.json && mv tmp.json .vscode/settings.json"]
+      description: "Set VS Code to Light Modern theme"
+      conditions:
+        file_exists: [".vscode/settings.json"]
+
     install-deps:
       name: "Install Dependencies"
       command: ["pnpm", "install"]
@@ -266,4 +296,13 @@ scripts:
     clean: "clean-build"
     reset: "reset-database"
     migrate: "migrate-database"
-    theme: "sync-terminal-theme"
+    theme: "theme-dark"
+    light: "theme-light"
+    setup: "workspace-setup"
+
+# Usage Examples:
+# - Interactive selection: `wkt run` (shows all available scripts)
+# - Direct execution: `wkt run theme-dark`
+# - Shortcut usage: `wkt run theme` (runs theme-dark)
+# - List all scripts: `wkt run list`
+# - Dry run: `wkt run workspace-setup --dry`
