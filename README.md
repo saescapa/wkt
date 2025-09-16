@@ -5,8 +5,11 @@ A flexible CLI tool for managing multiple project working directories using git 
 ## Features
 
 - **Multi-repository management** - Handle multiple projects with intelligent discovery
-- **Zero-configuration start** - Works immediately with sensible defaults  
+- **Zero-configuration start** - Works immediately with sensible defaults
 - **Workspace isolation** - Each workspace is completely independent
+- **🆕 Smart workspace detection** - Automatically detects current workspace from directory path
+- **🆕 Interactive script selection** - Choose scripts from a beautiful menu interface
+- **🆕 Hierarchical configuration** - Global, project, and workspace-level script configurations
 - **Smart automation** - Branch name inference, auto-cleanup, conflict prevention
 - **Rich CLI experience** - Interactive selection, fuzzy search, colored output
 
@@ -165,6 +168,9 @@ wkt exec feature-auth "npm run build" --timeout 300000
 Run predefined scripts in workspaces (safer than direct execution).
 
 ```bash
+# Interactive script selection - shows all available scripts
+wkt run
+
 # Run script in current workspace
 wkt run install-deps
 
@@ -183,6 +189,12 @@ wkt run dev-server  # Only available for feature/* branches
 # Use script shortcuts
 wkt run i           # Shortcut for "install-deps"
 ```
+
+**🆕 Interactive Script Selection:**
+- **Smart detection**: Automatically detects workspace from current directory
+- **Interactive menu**: Run `wkt run` without arguments to see available scripts
+- **Multi-source scripts**: Combines global, project, and workspace-specific scripts
+- **Clear descriptions**: Shows script descriptions and sources for easy selection
 
 **Interactive Selection:**
 - **Checkbox interface**: Select/deselect workspaces with spacebar, confirm with enter
@@ -221,7 +233,13 @@ Default directory structure:
 
 ### Script Configuration
 
-WKT supports secure script execution through `.wkt.yaml` configuration. Scripts are predefined, use command allowlisting, and require confirmation before execution.
+WKT supports secure script execution through `.wkt.yaml` configuration files. Scripts are predefined, use command allowlisting, and require confirmation before execution.
+
+**🆕 Configuration Hierarchy:**
+- **Global**: `~/.wkt/config.yaml` - Available across all projects
+- **Project**: `~/.wkt/config.yaml` projects section - Project-specific scripts
+- **Workspace**: `.wkt.yaml` in workspace directory - Workspace-specific scripts
+- **Priority**: Workspace → Project → Global (higher priority configs override lower ones)
 
 #### Basic Script Configuration
 
@@ -465,9 +483,12 @@ local_files:
 ### ✅ Implemented
 - Project initialization (`wkt init`)
 - Workspace creation (`wkt create`)
-- Workspace switching (`wkt switch`) 
+- Workspace switching (`wkt switch`)
 - Workspace listing (`wkt list`)
 - **Interactive cleanup command (`wkt clean`)** - Enhanced merge detection, interactive selection, and local branch protection
+- **🆕 Smart workspace detection** - Automatic workspace detection from current directory path
+- **🆕 Interactive script selection (`wkt run`)** - Beautiful menu interface for script selection
+- **🆕 Hierarchical script configuration** - Global, project, and workspace-level `.wkt.yaml` support
 - **Script execution (`wkt exec` / `wkt run`)** - Secure command execution with allowlisting, confirmation, and hooks
 - **Post-creation automation** - Automatic script execution after workspace creation
 - Sync command (`wkt sync`)
