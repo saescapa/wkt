@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import type { WKTDatabase, Project, Workspace } from './types.js';
 import { ConfigManager } from './config.js';
 
@@ -145,13 +145,35 @@ export class DatabaseManager {
   }
 
   searchWorkspaces(query: string, projectName?: string): Workspace[] {
-    const workspaces = projectName 
+    const workspaces = projectName
       ? this.getWorkspacesByProject(projectName)
       : this.getAllWorkspaces();
 
-    return workspaces.filter(workspace => 
+    return workspaces.filter(workspace =>
       workspace.name.toLowerCase().includes(query.toLowerCase()) ||
       workspace.branchName.toLowerCase().includes(query.toLowerCase())
     );
+  }
+
+  getWorkspaceFromPath(currentPath?: string): Workspace | undefined {
+    const targetPath = resolve(currentPath || process.cwd());
+    const allWorkspaces = this.getAllWorkspaces();
+
+    // Find workspace whose path matches the current directory
+    return allWorkspaces.find(workspace => {
+      const workspacePath = resolve(workspace.path);
+      return targetPath === workspacePath || targetPath.startsWith(workspacePath + '/');
+    });
+  }
+
+  getCurrentWorkspaceContext(): Workspace | undefined {
+    // First try to detect from current directory
+    const pathBasedWorkspace = this.getWorkspaceFromPath();
+    if (pathBasedWorkspace) {
+      return pathBasedWorkspace;
+    }
+
+    // Fall back to stored current workspace
+    return this.getCurrentWorkspace();
   }
 }

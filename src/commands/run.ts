@@ -17,9 +17,9 @@ export async function runCommand(
   if (workspaceIdentifier) {
     // Handle current workspace shortcut
     if (workspaceIdentifier === '.') {
-      const currentWorkspace = dbManager.getCurrentWorkspace();
+      const currentWorkspace = dbManager.getCurrentWorkspaceContext();
       if (!currentWorkspace) {
-        console.error(chalk.red('No current workspace set. Use `wkt switch` to select one.'));
+        console.error(chalk.red('No workspace detected. Ensure you are in a workspace directory or use `wkt switch` to select one.'));
         process.exit(1);
       }
       workspaceIdentifier = currentWorkspace.id;
@@ -33,13 +33,13 @@ export async function runCommand(
       process.exit(1);
     }
   } else {
-    // Use current workspace
-    const currentWorkspace = dbManager.getCurrentWorkspace();
+    // Use current workspace (detect from path first, then fall back to stored)
+    const currentWorkspace = dbManager.getCurrentWorkspaceContext();
     if (!currentWorkspace) {
-      console.error(chalk.red('No current workspace set. Use `wkt switch` to select one or specify workspace.'));
+      console.error(chalk.red('No workspace detected. Ensure you are in a workspace directory or use `wkt switch` to select one.'));
       process.exit(1);
     }
-    
+
     workspace = currentWorkspace;
   }
 
