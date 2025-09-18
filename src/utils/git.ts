@@ -168,7 +168,9 @@ export class GitUtils {
 
     try {
       if (baseBranch && !branchExists) {
-        await this.executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, baseBranch], bareRepoPath);
+        // For bare repos, prefer remote reference to ensure we get the latest commit
+        const baseRef = await this.getLatestBranchReference(bareRepoPath, baseBranch);
+        await this.executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, baseRef], bareRepoPath);
       } else {
         await this.executeCommand(['git', 'worktree', 'add', workspacePath, branchName], bareRepoPath);
       }
@@ -181,25 +183,40 @@ export class GitUtils {
           errorMessage.includes('invalid reference: HEAD')) {
         // This is an empty repository, we need to create the initial structure differently
 
-        // Create directory
-        await this.executeCommand(['mkdir', '-p', workspacePath], undefined);
-
-        // Clone the bare repo into the workspace to establish the connection
+        // Handle empty repository - create a proper initial workspace
         const originUrl = await this.executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
-        await this.executeCommand(['git', 'clone', originUrl, workspacePath], undefined);
 
-        // Remove the cloned workspace and recreate it properly
-        await this.executeCommand(['rm', '-rf', workspacePath], undefined);
-
-        // Create worktree directory and initialize as orphan
+        // Create workspace directory
         await this.executeCommand(['mkdir', '-p', workspacePath], undefined);
+
+        // Initialize workspace as git repository
         await this.executeCommand(['git', 'init'], workspacePath);
         await this.executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
-        await this.executeCommand(['git', 'checkout', '--orphan', branchName], workspacePath);
-        await this.executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
 
-        // Push the branch to establish it in the bare repo
-        await this.executeCommand(['git', 'push', '-u', 'origin', branchName], workspacePath);
+        // Create and checkout the new branch
+        await this.executeCommand(['git', 'checkout', '-b', branchName], workspacePath);
+
+        // Try to fetch from remote to see if there are any commits
+        try {
+          await this.executeCommand(['git', 'fetch', 'origin'], workspacePath);
+          // If fetch succeeds, try to merge or rebase from remote main/master
+          try {
+            await this.executeCommand(['git', 'merge', `origin/${baseBranch || 'main'}`], workspacePath);
+          } catch {
+            try {
+              await this.executeCommand(['git', 'merge', 'origin/master'], workspacePath);
+            } catch {
+              // No remote branches to merge, create initial commit
+              await this.executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+            }
+          }
+        } catch {
+          // No remote refs available, create initial commit
+          await this.executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+        }
+
+        // Note: Not pushing to remote automatically for local development workflow
+        // Users can manually push when ready with: git push -u origin <branch-name>
       } else {
         // Re-throw other errors
         throw error;
@@ -234,6 +251,33 @@ export class GitUtils {
         return true;
       } catch {
         return false;
+      }
+    }
+  }
+
+  static async getLatestBranchReference(bareRepoPath: string, branchName: string): Promise<string> {
+    // First, try to use the remote reference (most up-to-date)
+    try {
+      await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${branchName}`], bareRepoPath);
+      return `origin/${branchName}`;
+    } catch {
+      // Fall back to local reference if remote doesn't exist
+      try {
+        await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], bareRepoPath);
+        return branchName;
+      } catch {
+        // Try alternative remote reference formats
+        try {
+          // Sometimes the reference might be under refs/remotes/origin without the origin/ prefix
+          const result = await this.executeCommand(['git', 'rev-parse', '--verify', `refs/remotes/origin/${branchName}`], bareRepoPath);
+          if (result.trim()) {
+            return `origin/${branchName}`;
+          }
+        } catch {
+          // If all else fails, return the branch name as-is
+          return branchName;
+        }
+        return branchName;
       }
     }
   }
