@@ -1,5 +1,6 @@
 import chalk from 'chalk';
-import { existsSync, rmSync } from 'fs';
+import { existsSync, rmSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 import inquirer from 'inquirer';
 import type { CommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
@@ -70,9 +71,21 @@ async function cleanAllWorkspaces(
   options: CommandOptions
 ): Promise<void> {
   const allWorkspaces = db.getAllWorkspaces();
-  
-  if (allWorkspaces.length === 0) {
+
+  // Check for orphaned directories
+  const orphanedDirs = await findOrphanedDirectories(db);
+
+  if (allWorkspaces.length === 0 && orphanedDirs.length === 0) {
     console.log(chalk.yellow('No workspaces to clean'));
+    return;
+  }
+
+  // Handle orphaned directories first if any exist
+  if (orphanedDirs.length > 0) {
+    await handleOrphanedDirectories(orphanedDirs, options);
+  }
+
+  if (allWorkspaces.length === 0) {
     return;
   }
 
@@ -260,21 +273,122 @@ async function shouldCleanWorkspace(
 }
 
 async function removeWorkspace(workspace: Workspace, project: Project, db: DatabaseManager): Promise<void> {
-  try {
-    if (existsSync(workspace.path)) {
+  let directoryRemoved = false;
+
+  // Try to remove via git worktree first
+  if (existsSync(workspace.path)) {
+    try {
       await GitUtils.removeWorktree(project.bareRepoPath, workspace.path);
-      console.log(chalk.green(`Removed workspace directory: ${workspace.path}`));
+      console.log(chalk.green(`Removed workspace via git worktree: ${workspace.path}`));
+      directoryRemoved = true;
+    } catch (error) {
+      console.log(chalk.yellow(`Git worktree remove failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      // Fallback to manual directory removal
+      try {
+        rmSync(workspace.path, { recursive: true, force: true });
+        console.log(chalk.yellow(`Force removed workspace directory: ${workspace.path}`));
+        directoryRemoved = true;
+      } catch (rmError) {
+        console.log(chalk.red(`Failed to remove directory ${workspace.path}: ${rmError instanceof Error ? rmError.message : 'Unknown error'}`));
+      }
     }
-    
-    db.removeWorkspace(workspace.id);
-    console.log(chalk.green(`✓ Cleaned workspace '${workspace.name}'`));
-  } catch (error) {
-    if (existsSync(workspace.path)) {
-      rmSync(workspace.path, { recursive: true, force: true });
-      console.log(chalk.yellow(`Force removed workspace directory: ${workspace.path}`));
-    }
-    
-    db.removeWorkspace(workspace.id);
-    console.log(chalk.green(`✓ Cleaned workspace '${workspace.name}' (forced)`));
+  } else {
+    console.log(chalk.gray(`Directory ${workspace.path} does not exist`));
+    directoryRemoved = true; // Consider it "removed" if it doesn't exist
   }
+
+  // Always remove from database, even if directory removal failed
+  db.removeWorkspace(workspace.id);
+
+  if (directoryRemoved) {
+    console.log(chalk.green(`✓ Cleaned workspace '${workspace.name}'`));
+  } else {
+    console.log(chalk.yellow(`⚠️  Workspace '${workspace.name}' removed from database but directory may still exist`));
+  }
+}
+
+async function findOrphanedDirectories(db: DatabaseManager): Promise<Array<{ projectName: string; dirName: string; fullPath: string }>> {
+  const orphanedDirs: Array<{ projectName: string; dirName: string; fullPath: string }> = [];
+  const allProjects = db.getAllProjects();
+  const allWorkspaces = db.getAllWorkspaces();
+
+  for (const project of allProjects) {
+    if (!existsSync(project.workspacesPath)) {
+      continue;
+    }
+
+    try {
+      const directories = readdirSync(project.workspacesPath);
+
+      for (const dirName of directories) {
+        const fullPath = join(project.workspacesPath, dirName);
+
+        // Check if it's actually a directory
+        if (!statSync(fullPath).isDirectory()) {
+          continue;
+        }
+
+        // Check if this directory corresponds to a known workspace
+        const hasWorkspace = allWorkspaces.some(w =>
+          w.projectName === project.name &&
+          (w.name === dirName || w.path === fullPath)
+        );
+
+        if (!hasWorkspace) {
+          orphanedDirs.push({
+            projectName: project.name,
+            dirName,
+            fullPath
+          });
+        }
+      }
+    } catch (error) {
+      console.log(chalk.yellow(`Warning: Could not read directories in ${project.workspacesPath}`));
+    }
+  }
+
+  return orphanedDirs;
+}
+
+async function handleOrphanedDirectories(
+  orphanedDirs: Array<{ projectName: string; dirName: string; fullPath: string }>,
+  options: CommandOptions
+): Promise<void> {
+  console.log(chalk.cyan(`\nFound ${orphanedDirs.length} orphaned workspace directories:`));
+
+  const choices = orphanedDirs.map(dir => ({
+    name: `${dir.dirName} [${dir.projectName}] (${dir.fullPath})`,
+    value: dir,
+    checked: true
+  }));
+
+  const { selectedOrphans } = await inquirer.prompt([
+    {
+      type: 'checkbox',
+      name: 'selectedOrphans',
+      message: 'Select orphaned directories to remove (use space to toggle, enter to confirm):',
+      choices: choices,
+      pageSize: Math.min(10, choices.length),
+    }
+  ]);
+
+  if (selectedOrphans.length === 0) {
+    console.log(chalk.yellow('No orphaned directories selected for removal'));
+    return;
+  }
+
+  console.log(chalk.cyan(`\nRemoving ${selectedOrphans.length} orphaned directories:`));
+
+  let removedCount = 0;
+  for (const dir of selectedOrphans) {
+    try {
+      rmSync(dir.fullPath, { recursive: true, force: true });
+      console.log(chalk.green(`✓ Removed orphaned directory: ${dir.fullPath}`));
+      removedCount++;
+    } catch (error) {
+      console.log(chalk.red(`Failed to remove ${dir.fullPath}: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Removed ${removedCount} orphaned directory(ies)`));
 }
