@@ -239,6 +239,18 @@ export class GitUtils {
     } catch (error) {
       console.warn('Warning: Could not configure origin remote in worktree');
     }
+
+    // Set up local main branch for easier local rebasing (if not already the current branch)
+    if (branchName !== 'main') {
+      try {
+        // Check if main branch exists on remote
+        await this.executeCommand(['git', 'show-ref', '--verify', '--quiet', 'refs/remotes/origin/main'], workspacePath);
+        // Create local tracking branch for main
+        await this.executeCommand(['git', 'branch', '--track', 'main', 'origin/main'], workspacePath);
+      } catch {
+        // main branch doesn't exist on remote or already exists locally, skip
+      }
+    }
   }
 
   static async branchExists(bareRepoPath: string, branchName: string): Promise<boolean> {
