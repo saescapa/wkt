@@ -6,6 +6,7 @@ export interface Project {
   defaultBranch: string;
   createdAt: Date;
   config?: ProjectConfig;
+  template?: string;  // Template name applied to this project
 }
 
 export interface Workspace {
@@ -87,6 +88,7 @@ export interface GlobalConfig {
   };
   scripts: ScriptConfig;      // Global script configuration
   projects: Record<string, ProjectConfig>;
+  project_templates?: Record<string, ProjectConfig>;  // Reusable project templates
   aliases: Record<string, string>;
 }
 
@@ -166,6 +168,8 @@ export interface RunCommandOptions extends BaseCommandOptions {
 
 export interface InitCommandOptions {
   list?: boolean;
+  template?: string;
+  applyTemplate?: boolean;  // For applying to existing projects
 }
 
 // Legacy interface for backward compatibility - will be deprecated

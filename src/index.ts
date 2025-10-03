@@ -20,9 +20,11 @@ program
 program
   .command('init')
   .description('Initialize WKT with a repository')
-  .argument('[repository-url]', 'Git repository URL')
+  .argument('[repository-url]', 'Git repository URL (or project name when using --apply-template)')
   .argument('[project-name]', 'Optional project name')
   .option('-l, --list', 'List all managed projects')
+  .option('-t, --template <name>', 'Apply a project template during initialization')
+  .option('--apply-template', 'Apply template to an existing project')
   .action(initCommand);
 
 program
