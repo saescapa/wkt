@@ -7,6 +7,7 @@ A flexible CLI tool for managing multiple project working directories using git 
 - **Multi-repository management** - Handle multiple projects with intelligent discovery
 - **Zero-configuration start** - Works immediately with sensible defaults
 - **Workspace isolation** - Each workspace is completely independent
+- **🆕 Project templates** - Apply reusable configurations across projects
 - **🆕 Smart workspace detection** - Automatically detects current workspace from directory path
 - **🆕 Interactive script selection** - Choose scripts from a beautiful menu interface
 - **🆕 Hierarchical configuration** - Global, project, and workspace-level script configurations
@@ -57,8 +58,17 @@ Initialize WKT with a repository.
 # Initialize with URL
 wkt init git@github.com:user/repo.git myproject
 
+# Initialize with a project template
+wkt init git@github.com:user/repo.git myproject --template dev
+
 # Initialize from current git repo
 cd ~/my-project && wkt init
+
+# Apply template to existing project
+wkt init --apply-template paris dev
+
+# Apply template interactively
+wkt init --apply-template
 
 # List all projects
 wkt init --list
@@ -230,6 +240,63 @@ Default directory structure:
     └── other-project/
         └── feature-docs/
 ```
+
+### Project Templates
+
+**🆕 Reusable Project Templates** - Define templates to apply consistent configurations across multiple projects.
+
+Project templates allow you to define reusable configurations that can be applied to projects during initialization or later. This is particularly useful for applying the same local files, scripts, and git settings across multiple development projects.
+
+**Defining Templates:**
+
+Add templates to `~/.wkt/config.yaml`:
+
+```yaml
+project_templates:
+  dev:
+    local_files:
+      shared:
+        - "docs.local"      # Shared documentation
+        - "prompts.local"   # AI prompts
+        - "rfc.local"       # RFCs and design docs
+      copied:
+        - ".env.local"
+    git:
+      auto_fetch: true
+      push_on_create: false
+
+  production:
+    local_files:
+      shared:
+        - "SECURITY.md"
+        - ".incident-response"
+    git:
+      auto_fetch: true
+      auto_rebase: false
+```
+
+**Using Templates:**
+
+```bash
+# Apply during project initialization
+wkt init git@github.com:user/repo.git myproject --template dev
+
+# Apply to existing project
+wkt init --apply-template myproject dev
+
+# Interactive template selection
+wkt init --apply-template
+
+# Interactive during init (if templates are configured)
+wkt init git@github.com:user/repo.git myproject
+# → Prompts: "Would you like to apply a project template?"
+```
+
+**Benefits:**
+- **Consistency**: Same configuration across all dev projects
+- **Quick setup**: Apply comprehensive configs with one command
+- **Retroactive**: Apply templates to existing projects
+- **Flexible**: Different templates for different project types
 
 ### Script Configuration
 

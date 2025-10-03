@@ -80,6 +80,14 @@ export class DatabaseManager {
     return Object.values(db.projects);
   }
 
+  updateProject(project: Project): void {
+    const db = this.getDatabase();
+    if (db.projects[project.name]) {
+      db.projects[project.name] = project;
+      this.saveDatabase();
+    }
+  }
+
   removeProject(name: string): void {
     const db = this.getDatabase();
     delete db.projects[name];
