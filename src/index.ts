@@ -11,6 +11,7 @@ import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
 import { execCommand } from './commands/exec.js';
 import { runCommand } from './commands/run.js';
+import { recycleCommand } from './commands/recycle.js';
 
 program
   .name('wkt')
@@ -111,6 +112,16 @@ program
   .action((scriptName, workspace, options) => {
     runCommand(scriptName, workspace, options);
   });
+
+program
+  .command('recycle')
+  .description('Recycle current workspace to a new branch while preserving all files')
+  .argument('<new-branch-name>', 'New branch name')
+  .option('--from <branch>', 'Base branch to rebase from (default: main)')
+  .option('--no-rebase', 'Skip rebasing from base branch')
+  .option('--name <name>', 'Custom workspace name (default: inferred from branch)')
+  .option('--force', 'Force recycle even if working tree is dirty')
+  .action(recycleCommand);
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));

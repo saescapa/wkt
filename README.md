@@ -128,6 +128,33 @@ wkt list --details
 wkt list --filter "feature/*"
 ```
 
+### `wkt recycle <new-branch-name>`
+Recycle current workspace to a new branch while preserving all files (including node_modules, build artifacts, etc.).
+
+```bash
+# Recycle to new feature branch, rebase from latest main
+wkt recycle feature/new-auth
+
+# Recycle without rebasing (just switch branches, keep files)
+wkt recycle feature/quick-test --no-rebase
+
+# Recycle from specific base branch
+wkt recycle hotfix/critical --from develop
+
+# Custom workspace name
+wkt recycle feature/ui-redesign --name ui-redesign
+
+# Force recycle even with uncommitted changes
+wkt recycle feature/experiment --force
+```
+
+**Benefits:**
+- **Preserve dependencies** - Keep node_modules, vendor/, etc.
+- **Keep build artifacts** - Preserve dist/, build/, compiled files
+- **Maintain local config** - Keep .env.local and other workspace-specific files
+- **Stay in same directory** - No need to switch paths or reinstall
+- **Optional sync** - Pull and rebase from latest main before starting
+
 ### `wkt clean`
 Clean up workspaces with interactive selection (defaults to merged branches only).
 
@@ -550,12 +577,13 @@ local_files:
 ### ✅ Implemented
 - Project initialization (`wkt init`)
 - Workspace creation (`wkt create`)
+- **🆕 Workspace recycling (`wkt recycle`)** - Reuse workspace for new branch, preserving all files and dependencies
 - Workspace switching (`wkt switch`)
 - Workspace listing (`wkt list`)
 - **Interactive cleanup command (`wkt clean`)** - Enhanced merge detection, interactive selection, and local branch protection
-- **🆕 Smart workspace detection** - Automatic workspace detection from current directory path
-- **🆕 Interactive script selection (`wkt run`)** - Beautiful menu interface for script selection
-- **🆕 Hierarchical script configuration** - Global, project, and workspace-level `.wkt.yaml` support
+- **Smart workspace detection** - Automatic workspace detection from current directory path
+- **Interactive script selection (`wkt run`)** - Beautiful menu interface for script selection
+- **Hierarchical script configuration** - Global, project, and workspace-level `.wkt.yaml` support
 - **Script execution (`wkt exec` / `wkt run`)** - Secure command execution with allowlisting, confirmation, and hooks
 - **Post-creation automation** - Automatic script execution after workspace creation
 - Sync command (`wkt sync`)

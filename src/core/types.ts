@@ -195,6 +195,8 @@ export interface CommandOptions extends BaseCommandOptions {
   timeout?: number;
   workspace?: string;
   global?: boolean;
+  // Recycle options
+  rebase?: boolean;
 }
 
 // Safe script execution types
