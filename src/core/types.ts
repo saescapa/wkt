@@ -21,6 +21,7 @@ export interface Workspace {
   status: WorkspaceStatus;
   commitsAhead?: number;
   commitsBehind?: number;
+  description?: string;
 }
 
 export interface WorkspaceStatus {
@@ -124,6 +125,7 @@ export interface CreateCommandOptions extends BaseCommandOptions {
   name?: string;
   template?: string;
   checkout?: boolean;
+  description?: string;
 }
 
 export interface SwitchCommandOptions extends BaseCommandOptions {
@@ -197,6 +199,7 @@ export interface CommandOptions extends BaseCommandOptions {
   global?: boolean;
   // Recycle options
   rebase?: boolean;
+  description?: string;
 }
 
 // Safe script execution types

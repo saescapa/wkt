@@ -190,6 +190,11 @@ export async function recycleCommand(
     workspace.commitsBehind = updatedCommitsDiff.behind;
     workspace.lastUsed = new Date();
 
+    // Update description if provided
+    if (options.description !== undefined) {
+      workspace.description = options.description;
+    }
+
     // Update workspace name if needed
     if (options.name) {
       const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;

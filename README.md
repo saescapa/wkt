@@ -7,6 +7,7 @@ A flexible CLI tool for managing multiple project working directories using git 
 - **Multi-repository management** - Handle multiple projects with intelligent discovery
 - **Zero-configuration start** - Works immediately with sensible defaults
 - **Workspace isolation** - Each workspace is completely independent
+- **🆕 Workspace descriptions** - Add memorable descriptions to workspaces (e.g., "Splits feature" for eng-1663)
 - **🆕 Project templates** - Apply reusable configurations across projects
 - **🆕 Smart workspace detection** - Automatically detects current workspace from directory path
 - **🆕 Interactive script selection** - Choose scripts from a beautiful menu interface
@@ -84,6 +85,9 @@ wkt create myproject feature/auth-system
 # With branch inference (1234 → feature/eng-1234)
 wkt create myproject 1234
 
+# With description to remember what the branch is about
+wkt create myproject 1663 --description "Splits feature"
+
 # From specific base branch
 wkt create myproject hotfix/bug --from develop
 
@@ -135,6 +139,9 @@ Recycle current workspace to a new branch while preserving all files (including 
 # Recycle to new feature branch, rebase from latest main
 wkt recycle feature/new-auth
 
+# Recycle with updated description
+wkt recycle 1789 --description "New payment flow"
+
 # Recycle without rebasing (just switch branches, keep files)
 wkt recycle feature/quick-test --no-rebase
 
@@ -179,6 +186,46 @@ wkt clean --force
 
 # Force remove specific workspace (overrides safety checks)
 wkt clean feature-auth --force
+```
+
+### `wkt describe [workspace] [description]`
+View or update workspace descriptions.
+
+```bash
+# Interactive: prompt for description
+wkt describe
+
+# Set description for current workspace
+wkt describe . "Splits feature implementation"
+
+# Set description for specific workspace
+wkt describe feature-eng-1663 "Splits feature"
+
+# Update description for a workspace
+wkt describe myproject/main "Main development branch"
+
+# Remove description (set to empty)
+wkt describe feature-eng-1663 ""
+```
+
+### `wkt info`
+Show detailed information about the current workspace.
+
+```bash
+# Show full workspace information
+wkt info
+
+# Output only the description (useful for shell prompts)
+wkt info --description-only
+
+# Output only the branch name
+wkt info --branch-only
+
+# Output only the workspace name
+wkt info --name-only
+
+# Output as JSON for scripting
+wkt info --json
 ```
 
 ### `wkt exec`
@@ -577,6 +624,7 @@ local_files:
 ### ✅ Implemented
 - Project initialization (`wkt init`)
 - Workspace creation (`wkt create`)
+- **🆕 Workspace descriptions (`wkt describe` / `wkt info`)** - Add memorable descriptions to workspaces, displayed in listings and shell prompts
 - **🆕 Workspace recycling (`wkt recycle`)** - Reuse workspace for new branch, preserving all files and dependencies
 - Workspace switching (`wkt switch`)
 - Workspace listing (`wkt list`)
@@ -676,6 +724,49 @@ function wktl() {
         cd "$path"
     fi
 }
+```
+
+### Shell Prompt Integration
+
+Display workspace descriptions in your shell prompt using `wkt info`:
+
+**For Oh-My-Zsh / Zsh:**
+
+Add to your `.zshrc`:
+
+```bash
+# Custom prompt function to show workspace description
+wkt_info() {
+  local desc=$(wkt info --description-only 2>/dev/null)
+  if [ -n "$desc" ]; then
+    echo " [$desc]"
+  fi
+}
+
+# Add to your prompt (example with existing git prompt)
+PROMPT='%{$fg[cyan]%}%~%{$reset_color%}$(git_prompt_info)$(wkt_info) %# '
+```
+
+**For Bash:**
+
+Add to your `.bashrc`:
+
+```bash
+# Function to get workspace description
+wkt_info() {
+  local desc=$(wkt info --description-only 2>/dev/null)
+  if [ -n "$desc" ]; then
+    echo " [$desc]"
+  fi
+}
+
+# Update PS1 (example)
+PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(wkt_info)\$ '
+```
+
+**Result:** Your prompt will show:
+```
+~/projects/myproject/feature-eng-1663 [Splits feature] $
 ```
 
 ### Usage Examples
