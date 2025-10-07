@@ -93,6 +93,7 @@ export async function createCommand(
       status,
       commitsAhead: commitsDiff.ahead,
       commitsBehind: commitsDiff.behind,
+      description: options.description,
     };
 
     dbManager.addWorkspace(workspace);

@@ -12,6 +12,8 @@ import { syncCommand } from './commands/sync.js';
 import { execCommand } from './commands/exec.js';
 import { runCommand } from './commands/run.js';
 import { recycleCommand } from './commands/recycle.js';
+import { describeCommand } from './commands/describe.js';
+import { infoCommand } from './commands/info.js';
 
 program
   .name('wkt')
@@ -35,6 +37,7 @@ program
   .argument('<branch-name>', 'Branch name')
   .option('--from <branch>', 'Base branch (default: main/master)', 'main')
   .option('--name <name>', 'Custom workspace directory name')
+  .option('--description <text>', 'Workspace description (e.g., "Splits feature")')
   .option('--template <template>', 'Apply workspace template')
   .option('--no-checkout', 'Create but don\'t checkout')
   .option('--force', 'Overwrite existing workspace')
@@ -120,8 +123,25 @@ program
   .option('--from <branch>', 'Base branch to rebase from (default: main)')
   .option('--no-rebase', 'Skip rebasing from base branch')
   .option('--name <name>', 'Custom workspace name (default: inferred from branch)')
+  .option('--description <text>', 'Update workspace description')
   .option('--force', 'Force recycle even if working tree is dirty')
   .action(recycleCommand);
+
+program
+  .command('describe')
+  .description('View or update workspace description')
+  .argument('[workspace]', 'Workspace name (optional, uses current workspace if not specified)')
+  .argument('[description]', 'New description (optional, prompts if not provided)')
+  .action(describeCommand);
+
+program
+  .command('info')
+  .description('Show detailed information about current workspace')
+  .option('--description-only', 'Output only the description (for shell integration)')
+  .option('--branch-only', 'Output only the branch name')
+  .option('--name-only', 'Output only the workspace name')
+  .option('--json', 'Output as JSON')
+  .action(infoCommand);
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));

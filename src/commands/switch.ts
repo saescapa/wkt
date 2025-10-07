@@ -118,6 +118,9 @@ export async function switchCommand(
       console.log(selectedWorkspace.path);
     } else {
       console.log(chalk.green(`✓ Switched to workspace '${selectedWorkspace.name}'`));
+      if (selectedWorkspace.description) {
+        console.log(chalk.dim(`  ${selectedWorkspace.description}`));
+      }
       console.log(chalk.gray(`  Project: ${selectedWorkspace.projectName}`));
       console.log(chalk.gray(`  Branch: ${selectedWorkspace.branchName}`));
       console.log(chalk.gray(`  Path: ${selectedWorkspace.path}`));
@@ -211,10 +214,16 @@ async function selectFromMultipleMatches(matches: Workspace[]): Promise<Workspac
 function formatWorkspaceChoice(workspace: Workspace): string {
   const statusColor = workspace.status.clean ? chalk.green : chalk.yellow;
   const statusIcon = workspace.status.clean ? '●' : '◐';
-  
+
   const lastUsedTime = formatTimeAgo(workspace.lastUsed);
-  
-  return `${statusColor(statusIcon)} ${chalk.bold(workspace.projectName)}/${workspace.name} ${chalk.gray(`(${workspace.branchName})`)} ${chalk.gray(`- ${lastUsedTime}`)}`;
+
+  let choice = `${statusColor(statusIcon)} ${chalk.bold(workspace.projectName)}/${workspace.name} ${chalk.gray(`(${workspace.branchName})`)}`;
+  if (workspace.description) {
+    choice += ` ${chalk.dim(`- ${workspace.description}`)}`;
+  }
+  choice += ` ${chalk.gray(`- ${lastUsedTime}`)}`;
+
+  return choice;
 }
 
 function formatTimeAgo(date: Date): string {

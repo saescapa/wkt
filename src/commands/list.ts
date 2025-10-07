@@ -77,22 +77,25 @@ function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boo
   const statusIcon = getStatusIcon(workspace);
   const statusText = getStatusText(workspace);
   const timeAgo = formatTimeAgo(workspace.lastUsed);
-  
+
   let name = workspace.name;
   if (includeProject) {
     name = `${workspace.projectName}/${workspace.name}`;
   }
 
   let line = `${prefix}${statusIcon} ${chalk.bold(name)}`;
-  
+
   if (showDetails) {
+    if (workspace.description) {
+      line += ` ${chalk.dim(`- ${workspace.description}`)}`;
+    }
     line += `\n${prefix}    Branch: ${chalk.cyan(workspace.branchName)}`;
     line += `\n${prefix}    Base: ${chalk.gray(workspace.baseBranch)}`;
     line += `\n${prefix}    Path: ${chalk.gray(workspace.path)}`;
     line += `\n${prefix}    Status: ${statusText}`;
     line += `\n${prefix}    Created: ${chalk.gray(workspace.createdAt.toLocaleDateString())}`;
     line += `\n${prefix}    Last used: ${chalk.gray(timeAgo)}`;
-    
+
     if (workspace.commitsAhead || workspace.commitsBehind) {
       const ahead = workspace.commitsAhead || 0;
       const behind = workspace.commitsBehind || 0;
@@ -102,6 +105,9 @@ function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boo
     }
   } else {
     line += ` ${chalk.gray(`(${workspace.branchName})`)}`;
+    if (workspace.description) {
+      line += ` ${chalk.dim(`- ${workspace.description}`)}`;
+    }
     line += ` ${statusText}`;
     line += ` ${chalk.gray(`- ${timeAgo}`)}`;
   }
