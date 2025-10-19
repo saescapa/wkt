@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import type { CommandOptions } from '../core/types.js';
+import type { CommandOptions, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';

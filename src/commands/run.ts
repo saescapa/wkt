@@ -291,7 +291,7 @@ function mergeScriptConfigs(
   projectScripts?: any,
   workspaceScripts?: any
 ): ScriptConfig {
-  const defaultConfig = {
+  const defaultConfig: ScriptConfig = {
     scripts: {},
     allowed_commands: [],
     hooks: {},
