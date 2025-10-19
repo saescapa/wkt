@@ -7,6 +7,7 @@ A flexible CLI tool for managing multiple project working directories using git 
 - **Multi-repository management** - Handle multiple projects with intelligent discovery
 - **Zero-configuration start** - Works immediately with sensible defaults
 - **Workspace isolation** - Each workspace is completely independent
+- **🆕 Workspace renaming** - Rename workspaces and branches with simple or full recycle modes
 - **🆕 Workspace descriptions** - Add memorable descriptions to workspaces (e.g., "Splits feature" for eng-1663)
 - **🆕 Project templates** - Apply reusable configurations across projects
 - **🆕 Smart workspace detection** - Automatically detects current workspace from directory path
@@ -132,35 +133,55 @@ wkt list --details
 wkt list --filter "feature/*"
 ```
 
-### `wkt recycle <new-branch-name>`
-Recycle current workspace to a new branch while preserving all files (including node_modules, build artifacts, etc.).
+### `wkt rename <new-name>`
+Rename current workspace with optional branch renaming.
 
 ```bash
-# Recycle to new feature branch, rebase from latest main
-wkt recycle feature/new-auth
+# Simple rename: update workspace name and rename branch in-place
+wkt rename feature/new-feature --no-rebase
 
-# Recycle with updated description
-wkt recycle 1789 --description "New payment flow"
+# Full recycle: create new branch, rebase from latest main, reset metadata
+wkt rename feature/new-auth
 
-# Recycle without rebasing (just switch branches, keep files)
-wkt recycle feature/quick-test --no-rebase
+# Rename with updated description
+wkt rename 1789 --description "New payment flow"
 
-# Recycle from specific base branch
-wkt recycle hotfix/critical --from develop
+# Rename from specific base branch (when recycling)
+wkt rename hotfix/critical --from develop
 
-# Custom workspace name
-wkt recycle feature/ui-redesign --name ui-redesign
+# Custom workspace directory name
+wkt rename feature/ui-redesign --name ui-redesign
 
-# Force recycle even with uncommitted changes
-wkt recycle feature/experiment --force
+# Force rename even with uncommitted changes
+wkt rename feature/experiment --force
 ```
+
+**Two modes:**
+- **Simple rename** (with `--no-rebase`): Renames the git branch in-place (using `git branch -m`) and updates workspace metadata. Keeps all timestamps and history.
+- **Recycle mode** (default): Creates a new branch, optionally rebases from latest main, and resets workspace metadata (createdAt, lastUsed) for a fresh start. Perfect for reusing a workspace for entirely new work.
 
 **Benefits:**
 - **Preserve dependencies** - Keep node_modules, vendor/, etc.
 - **Keep build artifacts** - Preserve dist/, build/, compiled files
 - **Maintain local config** - Keep .env.local and other workspace-specific files
 - **Stay in same directory** - No need to switch paths or reinstall
-- **Optional sync** - Pull and rebase from latest main before starting
+- **Optional sync** - Pull and rebase from latest main before starting (recycle mode)
+- **Fresh start** - Reset workspace creation date when recycling
+
+### `wkt recycle <new-branch-name>`
+Alias for `wkt rename` - Recycle current workspace to a new branch while preserving all files.
+
+```bash
+# Recycle to new feature branch (equivalent to: wkt rename feature/new-auth)
+wkt recycle feature/new-auth
+
+# All recycle options work the same as rename
+wkt recycle 1789 --description "New payment flow"
+wkt recycle feature/quick-test --no-rebase
+wkt recycle hotfix/critical --from develop
+```
+
+**Note:** `recycle` is an alias for `rename` with the same behavior. Use whichever name feels more natural for your workflow.
 
 ### `wkt clean`
 Clean up workspaces with interactive selection (defaults to merged branches only).
@@ -625,7 +646,8 @@ local_files:
 - Project initialization (`wkt init`)
 - Workspace creation (`wkt create`)
 - **🆕 Workspace descriptions (`wkt describe` / `wkt info`)** - Add memorable descriptions to workspaces, displayed in listings and shell prompts
-- **🆕 Workspace recycling (`wkt recycle`)** - Reuse workspace for new branch, preserving all files and dependencies
+- **🆕 Workspace renaming (`wkt rename`)** - Rename workspaces with simple rename or full recycle mode
+- **🆕 Workspace recycling (`wkt recycle`)** - Alias for `wkt rename` - reuse workspace for new branch, preserving all files and dependencies
 - Workspace switching (`wkt switch`)
 - Workspace listing (`wkt list`)
 - **Interactive cleanup command (`wkt clean`)** - Enhanced merge detection, interactive selection, and local branch protection
