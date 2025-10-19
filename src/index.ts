@@ -11,6 +11,7 @@ import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
 import { execCommand } from './commands/exec.js';
 import { runCommand } from './commands/run.js';
+import { renameCommand } from './commands/rename.js';
 import { recycleCommand } from './commands/recycle.js';
 import { describeCommand } from './commands/describe.js';
 import { infoCommand } from './commands/info.js';
@@ -117,8 +118,19 @@ program
   });
 
 program
+  .command('rename')
+  .description('Rename current workspace (optionally with new branch)')
+  .argument('<new-name>', 'New workspace/branch name')
+  .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: main)')
+  .option('--no-rebase', 'Simple rename: rename branch in-place without creating new branch or rebasing')
+  .option('--name <name>', 'Custom workspace directory name (default: inferred from branch name)')
+  .option('--description <text>', 'Update workspace description')
+  .option('--force', 'Force rename even if working tree is dirty')
+  .action(renameCommand);
+
+program
   .command('recycle')
-  .description('Recycle current workspace to a new branch while preserving all files')
+  .description('Recycle current workspace to a new branch while preserving all files (alias for rename)')
   .argument('<new-branch-name>', 'New branch name')
   .option('--from <branch>', 'Base branch to rebase from (default: main)')
   .option('--no-rebase', 'Skip rebasing from base branch')
