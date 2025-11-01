@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { existsSync, renameSync } from 'fs';
+import { existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import type { CommandOptions, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
@@ -275,10 +275,10 @@ export async function renameCommand(
         throw new Error(`Directory '${newPath}' already exists. Use --force to overwrite.`);
       }
 
-      // Rename directory
+      // Rename directory using git worktree move to keep git references in sync
       console.log(chalk.blue(`\nRenaming workspace directory...`));
       try {
-        renameSync(oldPath, newPath);
+        await GitUtils.moveWorktree(project.bareRepoPath, oldPath, newPath);
         console.log(chalk.green(`✓ Directory renamed: ${basename(oldPath)} → ${newWorkspaceName}`));
       } catch (error) {
         throw new Error(`Failed to rename directory: ${error}`);

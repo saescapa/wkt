@@ -298,6 +298,10 @@ export class GitUtils {
     await this.executeCommand(['git', 'worktree', 'remove', workspacePath, '--force'], bareRepoPath);
   }
 
+  static async moveWorktree(bareRepoPath: string, oldPath: string, newPath: string): Promise<void> {
+    await this.executeCommand(['git', 'worktree', 'move', oldPath, newPath], bareRepoPath);
+  }
+
   static async listWorktrees(bareRepoPath: string): Promise<Array<{ path: string; branch: string; hash: string }>> {
     try {
       const result = await this.executeCommand(['git', 'worktree', 'list', '--porcelain'], bareRepoPath);
