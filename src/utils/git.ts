@@ -384,7 +384,14 @@ export class GitUtils {
   }
 
   static async rebaseBranch(workspacePath: string, baseBranch: string): Promise<void> {
-    await this.executeCommand(['git', 'rebase', `origin/${baseBranch}`], workspacePath);
+    // Get the bare repo path from the worktree to find the correct branch reference
+    const gitDir = await this.executeCommand(['git', 'rev-parse', '--git-common-dir'], workspacePath);
+    const bareRepoPath = gitDir.trim();
+
+    // Use getLatestBranchReference to intelligently find the correct reference
+    const branchRef = await this.getLatestBranchReference(bareRepoPath, baseBranch);
+
+    await this.executeCommand(['git', 'rebase', branchRef], workspacePath);
   }
 
   static async pullWithRebase(workspacePath: string): Promise<void> {
