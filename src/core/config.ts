@@ -36,7 +36,7 @@ export class ConfigManager {
       inference: {
         patterns: [
           { pattern: '^(\\d+)$', template: 'feature/eng-{}' },
-          { pattern: '^eng-(\\d+)$', template: 'feature/{}' },
+          { pattern: '^(eng-\\d+)$', template: 'feature/{}' },
           { pattern: '^(feature/.+)$', template: '{}' },
         ],
       },
