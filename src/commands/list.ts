@@ -1,9 +1,14 @@
 import chalk from 'chalk';
-import type { CommandOptions, Workspace } from '../core/types.js';
+import { existsSync } from 'fs';
+import type { ListCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
+import { ConfigManager } from '../core/config.js';
+import { GitUtils } from '../utils/git.js';
 
-export async function listCommand(options: CommandOptions = {}): Promise<void> {
+export async function listCommand(options: ListCommandOptions = {}): Promise<void> {
   const dbManager = new DatabaseManager();
+  const configManager = new ConfigManager();
+  const config = configManager.getConfig();
 
   let workspaces: Workspace[] = [];
 
@@ -22,9 +27,12 @@ export async function listCommand(options: CommandOptions = {}): Promise<void> {
     }
   }
 
+  // Update workspace status in real-time
+  await updateWorkspaceStatuses(workspaces, dbManager);
+
   if (options.filter) {
     const filterPattern = options.filter.toLowerCase();
-    workspaces = workspaces.filter(w => 
+    workspaces = workspaces.filter(w =>
       w.name.toLowerCase().includes(filterPattern) ||
       w.branchName.toLowerCase().includes(filterPattern) ||
       w.projectName.toLowerCase().includes(filterPattern)
@@ -32,6 +40,53 @@ export async function listCommand(options: CommandOptions = {}): Promise<void> {
 
     if (workspaces.length === 0) {
       console.log(chalk.yellow(`No workspaces found matching filter '${options.filter}'.`));
+      return;
+    }
+  }
+
+  // Apply smart filtering for inactive main branches (unless --all flag is used)
+  if (!options.all && config.display.hide_inactive_main_branches) {
+    const currentWorkspace = dbManager.getCurrentWorkspace();
+    const allProjects = dbManager.getAllProjects();
+    const projectDefaultBranches = new Map(
+      allProjects.map(p => [p.name, p.defaultBranch])
+    );
+
+    const now = new Date();
+    const inactiveDaysThreshold = config.display.main_branch_inactive_days;
+    const inactiveThresholdMs = inactiveDaysThreshold * 24 * 60 * 60 * 1000;
+
+    workspaces = workspaces.filter(workspace => {
+      const defaultBranch = projectDefaultBranches.get(workspace.projectName);
+      const isMainBranch = defaultBranch && workspace.branchName === defaultBranch;
+
+      if (!isMainBranch) {
+        return true; // Always show non-main branches
+      }
+
+      // Show main branch if it's the current workspace
+      if (currentWorkspace?.id === workspace.id) {
+        return true;
+      }
+
+      // Show main branch if it has uncommitted changes
+      if (!workspace.status.clean) {
+        return true;
+      }
+
+      // Show main branch if it was used recently
+      const timeSinceLastUse = now.getTime() - workspace.lastUsed.getTime();
+      if (timeSinceLastUse < inactiveThresholdMs) {
+        return true;
+      }
+
+      // Hide inactive main branch
+      return false;
+    });
+
+    if (workspaces.length === 0) {
+      console.log(chalk.yellow('No active workspaces found.'));
+      console.log(chalk.gray('Use --all to show inactive main branches.'));
       return;
     }
   }
@@ -196,4 +251,34 @@ function formatTimeAgo(date: Date): string {
   } else {
     return `${diffDays}d ago`;
   }
+}
+
+async function updateWorkspaceStatuses(workspaces: Workspace[], dbManager: DatabaseManager): Promise<void> {
+  // Update status for each workspace in parallel
+  const updates = workspaces.map(async (workspace) => {
+    // Skip if workspace path doesn't exist
+    if (!existsSync(workspace.path)) {
+      return;
+    }
+
+    try {
+      // Get current git status
+      const status = await GitUtils.getWorkspaceStatus(workspace.path);
+
+      // Update workspace status if it changed
+      if (status.clean !== workspace.status.clean ||
+          status.staged !== workspace.status.staged ||
+          status.unstaged !== workspace.status.unstaged ||
+          status.untracked !== workspace.status.untracked ||
+          status.conflicted !== workspace.status.conflicted) {
+        workspace.status = status;
+        dbManager.updateWorkspace(workspace);
+      }
+    } catch (error) {
+      // Silently skip workspaces with git errors (might be corrupted or deleted)
+      console.warn(`Warning: Could not update status for workspace ${workspace.name}`);
+    }
+  });
+
+  await Promise.all(updates);
 }

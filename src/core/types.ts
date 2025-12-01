@@ -78,6 +78,10 @@ export interface GlobalConfig {
     auto_rebase: boolean;
     push_on_create: boolean;
   };
+  display: {
+    hide_inactive_main_branches: boolean;
+    main_branch_inactive_days: number;
+  };
   inference: {
     patterns: InferencePattern[];
   };
@@ -140,6 +144,7 @@ export interface ListCommandOptions {
   details?: boolean;
   filter?: string;
   groupBy?: string;
+  all?: boolean;
 }
 
 export interface CleanCommandOptions extends BaseCommandOptions {
