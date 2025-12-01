@@ -117,11 +117,14 @@ wkt switch auth-system --path-only
 ```
 
 ### `wkt list`
-List all workspaces.
+List all workspaces with smart filtering of inactive main branches.
 
 ```bash
-# List all (grouped by project)
+# List all active workspaces (hides inactive main branches by default)
 wkt list
+
+# Show all workspaces including inactive main branches
+wkt list --all
 
 # List specific project
 wkt list --project myproject
@@ -132,6 +135,14 @@ wkt list --details
 # Filter by pattern
 wkt list --filter "feature/*"
 ```
+
+**Smart Filtering:**
+By default, `wkt list` hides inactive main branches to reduce clutter. A main branch is hidden if:
+- It's not the current workspace
+- It has no uncommitted changes
+- It hasn't been used in the last 7 days (configurable)
+
+Use `--all` to show all workspaces including inactive main branches.
 
 ### `wkt rename <new-name>`
 Rename current workspace with optional branch renaming.
@@ -335,6 +346,18 @@ Default directory structure:
     └── other-project/
         └── feature-docs/
 ```
+
+### Display Configuration
+
+Configure how workspaces are displayed in `wkt list`:
+
+```yaml
+display:
+  hide_inactive_main_branches: true  # Hide inactive main branches by default
+  main_branch_inactive_days: 7       # Days before considering a main branch inactive
+```
+
+**Smart filtering** reduces clutter by hiding main branches that haven't been used recently and have no uncommitted changes. The current workspace and dirty main branches are always shown.
 
 ### Project Templates
 

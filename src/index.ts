@@ -24,11 +24,11 @@ program
 program
   .command('init')
   .description('Initialize WKT with a repository')
-  .argument('[repository-url]', 'Git repository URL (or project name when using --apply-template)')
-  .argument('[project-name]', 'Optional project name')
+  .argument('[repository-url]', 'Git repository URL (optional if current directory is a git repo, or project name when using --apply-template)')
+  .argument('[project-name]', 'Custom project name (optional, inferred from repository URL or directory name if not provided)')
   .option('-l, --list', 'List all managed projects')
   .option('-t, --template <name>', 'Apply a project template during initialization')
-  .option('--apply-template', 'Apply template to an existing project')
+  .option('--apply-template', 'Apply template to an existing project (first argument becomes project name)')
   .action(initCommand);
 
 program
@@ -62,6 +62,7 @@ program
   .option('-d, --details', 'Show detailed information')
   .option('--filter <pattern>', 'Filter by pattern')
   .option('--group-by <field>', 'Group results by field', 'project')
+  .option('-a, --all', 'Show all workspaces including inactive main branches')
   .action(listCommand);
 
 program

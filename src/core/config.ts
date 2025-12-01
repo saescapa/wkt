@@ -33,6 +33,10 @@ export class ConfigManager {
         auto_rebase: false,
         push_on_create: false,
       },
+      display: {
+        hide_inactive_main_branches: true,
+        main_branch_inactive_days: 7,
+      },
       inference: {
         patterns: [
           { pattern: '^(\\d+)$', template: 'feature/eng-{}' },
