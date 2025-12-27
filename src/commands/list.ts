@@ -52,7 +52,7 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
 
   // Filter by stale (older than specified duration)
   if (options.stale) {
-    const { parseDuration } = await import('../utils/git.js');
+    const { parseDuration } = await import('../utils/git/index.js');
     try {
       const maxAge = parseDuration(options.stale);
       const now = Date.now();

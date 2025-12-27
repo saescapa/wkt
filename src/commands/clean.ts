@@ -5,7 +5,14 @@ import inquirer from 'inquirer';
 import type { CleanCommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
-import { GitUtils, parseDuration } from '../utils/git.js';
+import {
+  parseDuration,
+  isBranchMerged,
+  removeWorktree,
+  getBranchAge,
+  getCommitCountAhead,
+  getLastCommitInfo,
+} from '../utils/git/index.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import { formatTimeAgo } from '../utils/format.js';
 
@@ -227,23 +234,23 @@ async function shouldCleanWorkspace(
   // Check if we should only clean merged branches
   if (options.merged) {
     try {
-      const isMerged = await GitUtils.isBranchMerged(
+      const merged = await isBranchMerged(
         project.bareRepoPath,
         workspace.branchName,
         project.defaultBranch
       );
 
-      if (!isMerged) {
+      if (!merged) {
         // Gather additional details for unmerged branches
         const details: CleanCheckResult['details'] = {};
 
         // Get commit count ahead
         if (existsSync(workspace.path)) {
-          details.commitsAhead = await GitUtils.getCommitCountAhead(
+          details.commitsAhead = await getCommitCountAhead(
             workspace.path,
             project.defaultBranch
           );
-          details.lastCommit = await GitUtils.getLastCommitInfo(workspace.path) || undefined;
+          details.lastCommit = await getLastCommitInfo(workspace.path) ?? undefined;
         }
 
         return {
@@ -266,9 +273,9 @@ async function shouldCleanWorkspace(
   if (options.olderThan) {
     try {
       const maxAge = parseDuration(options.olderThan);
-      const branchAge = await GitUtils.getBranchAge(project.bareRepoPath, workspace.branchName);
+      const branchAgeDate = await getBranchAge(project.bareRepoPath, workspace.branchName);
 
-      if (!branchAge) {
+      if (!branchAgeDate) {
         return {
           clean: false,
           reason: `Could not determine age of branch '${workspace.branchName}'`,
@@ -276,7 +283,7 @@ async function shouldCleanWorkspace(
         };
       }
 
-      const ageMs = Date.now() - branchAge.getTime();
+      const ageMs = Date.now() - branchAgeDate.getTime();
       if (ageMs < maxAge) {
         const days = Math.floor(ageMs / (24 * 60 * 60 * 1000));
         return {
@@ -340,7 +347,7 @@ async function removeWorkspace(workspace: Workspace, project: Project, db: Datab
   // Try to remove via git worktree first
   if (existsSync(workspace.path)) {
     try {
-      await GitUtils.removeWorktree(project.bareRepoPath, workspace.path);
+      await removeWorktree(project.bareRepoPath, workspace.path);
       console.log(chalk.green(`Removed workspace via git worktree: ${workspace.path}`));
       directoryRemoved = true;
     } catch (error) {

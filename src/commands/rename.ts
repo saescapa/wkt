@@ -5,12 +5,20 @@ import { join, dirname, basename } from 'path';
 import type { RenameCommandOptions } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
-import { GitUtils } from '../utils/git.js';
+import {
+  executeCommand,
+  fetchAll,
+  branchExists,
+  rebaseBranch,
+  moveWorktree,
+  getWorkspaceStatus,
+  getCommitsDiff,
+} from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import {
   ErrorHandler,
   WorkspaceNotFoundError,
-  GitRepositoryError
+  GitRepositoryError,
 } from '../utils/errors.js';
 
 export async function renameCommand(
@@ -76,7 +84,7 @@ export async function renameCommand(
     }
 
     // Safety check: verify working tree status
-    const status = await GitUtils.getWorkspaceStatus(workspace.path);
+    const status = await getWorkspaceStatus(workspace.path);
     if (!status.clean && !options.force) {
       console.log(chalk.yellow('\n⚠️  Working tree has uncommitted changes:'));
       if (status.staged > 0) console.log(chalk.yellow(`  - ${status.staged} staged files`));
@@ -104,9 +112,9 @@ export async function renameCommand(
       const baseBranch = options.from || project.defaultBranch;
 
       console.log(chalk.blue(`\nFetching latest changes from ${baseBranch}...`));
-      await GitUtils.fetchAll(project.bareRepoPath);
+      await fetchAll(project.bareRepoPath);
 
-      const commitsDiff = await GitUtils.getCommitsDiff(workspace.path, baseBranch);
+      const commitsDiff = await getCommitsDiff(workspace.path, baseBranch);
       if (commitsDiff.ahead > 0) {
         console.log(chalk.yellow(`\n⚠️  Current branch has ${commitsDiff.ahead} local commit(s)`));
 
@@ -124,7 +132,7 @@ export async function renameCommand(
         } else {
           console.log(chalk.blue(`Rebasing onto ${baseBranch}...`));
           try {
-            await GitUtils.rebaseBranch(workspace.path, baseBranch);
+            await rebaseBranch(workspace.path, baseBranch);
             console.log(chalk.green('✓ Rebase successful'));
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -142,7 +150,7 @@ export async function renameCommand(
       } else {
         console.log(chalk.blue(`Updating to latest ${baseBranch}...`));
         try {
-          await GitUtils.rebaseBranch(workspace.path, baseBranch);
+          await rebaseBranch(workspace.path, baseBranch);
           console.log(chalk.green('✓ Updated to latest base branch'));
         } catch {
           console.log(chalk.yellow(`⚠️  Could not update from ${baseBranch}, continuing anyway...`));
@@ -150,9 +158,9 @@ export async function renameCommand(
       }
 
       // Check if new branch already exists
-      const branchExists = await GitUtils.branchExists(project.bareRepoPath, inferredBranchName);
+      const branchAlreadyExists = await branchExists(project.bareRepoPath, inferredBranchName);
 
-      if (branchExists) {
+      if (branchAlreadyExists) {
         console.log(chalk.yellow(`\nBranch '${inferredBranchName}' already exists.`));
         const { action } = await inquirer.prompt([
           {
@@ -188,16 +196,16 @@ export async function renameCommand(
 
         // Switch to existing branch
         console.log(chalk.blue(`\nSwitching to existing branch '${inferredBranchName}'...`));
-        await GitUtils.executeCommand(['git', 'checkout', inferredBranchName], workspace.path);
+        await executeCommand(['git', 'checkout', inferredBranchName], workspace.path);
       } else {
         // Create and switch to new branch
         console.log(chalk.blue(`\nCreating and switching to new branch '${inferredBranchName}'...`));
-        await GitUtils.executeCommand(['git', 'checkout', '-b', inferredBranchName], workspace.path);
+        await executeCommand(['git', 'checkout', '-b', inferredBranchName], workspace.path);
       }
 
       // Update workspace metadata with reset timestamps (recycle mode)
-      const updatedStatus = await GitUtils.getWorkspaceStatus(workspace.path);
-      const updatedCommitsDiff = await GitUtils.getCommitsDiff(workspace.path, baseBranch);
+      const updatedStatus = await getWorkspaceStatus(workspace.path);
+      const updatedCommitsDiff = await getCommitsDiff(workspace.path, baseBranch);
 
       workspace.branchName = inferredBranchName;
       workspace.baseBranch = baseBranch;
@@ -241,16 +249,16 @@ export async function renameCommand(
       console.log(chalk.blue(`\nRenaming git branch to '${inferredBranchName}'...`));
 
       try {
-        await GitUtils.executeCommand(['git', 'branch', '-m', inferredBranchName], workspace.path);
+        await executeCommand(['git', 'branch', '-m', inferredBranchName], workspace.path);
         console.log(chalk.green('✓ Git branch renamed'));
       } catch (error) {
         throw new GitRepositoryError(`Failed to rename git branch: ${error}`);
       }
 
       // Update workspace metadata (keep timestamps)
-      const updatedStatus = await GitUtils.getWorkspaceStatus(workspace.path);
+      const updatedStatus = await getWorkspaceStatus(workspace.path);
       const baseBranch = workspace.baseBranch || project.defaultBranch;
-      const updatedCommitsDiff = await GitUtils.getCommitsDiff(workspace.path, baseBranch);
+      const updatedCommitsDiff = await getCommitsDiff(workspace.path, baseBranch);
 
       workspace.branchName = inferredBranchName;
       workspace.status = updatedStatus;
@@ -278,7 +286,7 @@ export async function renameCommand(
       // Rename directory using git worktree move to keep git references in sync
       console.log(chalk.blue(`\nRenaming workspace directory...`));
       try {
-        await GitUtils.moveWorktree(project.bareRepoPath, oldPath, newPath);
+        await moveWorktree(project.bareRepoPath, oldPath, newPath);
         console.log(chalk.green(`✓ Directory renamed: ${basename(oldPath)} → ${newWorkspaceName}`));
       } catch (error) {
         throw new Error(`Failed to rename directory: ${error}`);

@@ -5,7 +5,13 @@ import inquirer from 'inquirer';
 import type { InitCommandOptions, Project } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
-import { GitUtils } from '../utils/git.js';
+import {
+  isGitRepository,
+  getBareRepoUrl,
+  cloneBareRepository,
+  getDefaultBranch,
+  fetchAll,
+} from '../utils/git/index.js';
 
 export async function initCommand(
   repositoryUrl?: string,
@@ -45,9 +51,9 @@ export async function initCommand(
   let inferredProjectName = projectName;
 
   if (!repoUrl) {
-    if (GitUtils.isGitRepository(process.cwd())) {
+    if (isGitRepository(process.cwd())) {
       try {
-        repoUrl = await GitUtils.getBareRepoUrl(process.cwd());
+        repoUrl = await getBareRepoUrl(process.cwd());
         if (!inferredProjectName) {
           inferredProjectName = basename(process.cwd());
         }
@@ -94,11 +100,11 @@ export async function initCommand(
     }
 
     console.log(chalk.gray(`Cloning bare repository to ${bareRepoPath}...`));
-    await GitUtils.cloneBareRepository(repoUrl, bareRepoPath);
+    await cloneBareRepository(repoUrl, bareRepoPath);
 
-    await GitUtils.fetchAll(bareRepoPath);
+    await fetchAll(bareRepoPath);
 
-    const defaultBranch = await GitUtils.getDefaultBranch(bareRepoPath);
+    const defaultBranch = await getDefaultBranch(bareRepoPath);
 
     const workspacesPath = join(configManager.getWorkspaceRoot(), inferredProjectName);
 

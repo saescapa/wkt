@@ -112,6 +112,7 @@ export interface WKTDatabase {
   workspaces: Record<string, Workspace>;
   metadata: {
     version: string;
+    schemaVersion: number;
     lastCleanup: Date;
     currentWorkspace?: string;
   };

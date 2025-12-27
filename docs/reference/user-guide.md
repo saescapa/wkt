@@ -507,6 +507,24 @@ wkt clean main --force
 
 ## Troubleshooting
 
+### Debug Mode
+
+Enable debug logging to diagnose issues:
+
+```bash
+# Via command-line flag
+wkt --debug <command>
+
+# Via environment variable
+WKT_DEBUG=1 wkt <command>
+```
+
+Debug mode shows:
+- Git commands being executed
+- Network retry attempts
+- Silent fallback operations
+- Migration status
+
 ### Broken Symlinks
 
 If shared files show as broken symlinks:
@@ -533,4 +551,17 @@ rm ~/.wkt/projects/my-project/.git/index.lock
 cd ~/.wkt/workspaces/my-project/feature-auth
 git fetch origin
 git status
+```
+
+### Network Issues
+
+WKT automatically retries network operations (clone, fetch, push) up to 3 times with exponential backoff. If you see retry messages:
+
+```bash
+# Check network connectivity
+git ls-remote origin
+
+# Force a fresh fetch
+cd ~/.wkt/projects/my-project
+git fetch --all
 ```

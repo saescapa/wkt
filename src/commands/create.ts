@@ -4,15 +4,21 @@ import chalk from 'chalk';
 import type { CreateCommandOptions, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
-import { GitUtils } from '../utils/git.js';
+import {
+  fetchAll,
+  createWorktree,
+  removeWorktree,
+  getWorkspaceStatus,
+  getCommitsDiff,
+} from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
-import { 
-  ErrorHandler, 
-  ProjectNotFoundError, 
-  WorkspaceExistsError, 
-  DirectoryExistsError
+import {
+  ErrorHandler,
+  ProjectNotFoundError,
+  WorkspaceExistsError,
+  DirectoryExistsError,
 } from '../utils/errors.js';
 
 export async function createCommand(
@@ -61,25 +67,25 @@ export async function createCommand(
 
     const baseBranch = options.from || project.defaultBranch;
 
-    await GitUtils.fetchAll(project.bareRepoPath);
+    await fetchAll(project.bareRepoPath);
 
     if (options.force && existsSync(workspacePath)) {
       try {
-        await GitUtils.removeWorktree(project.bareRepoPath, workspacePath);
+        await removeWorktree(project.bareRepoPath, workspacePath);
       } catch {
         // Ignore errors if worktree doesn't exist in git
       }
     }
 
-    await GitUtils.createWorktree(
+    await createWorktree(
       project.bareRepoPath,
       workspacePath,
       inferredBranchName,
       baseBranch
     );
 
-    const status = await GitUtils.getWorkspaceStatus(workspacePath);
-    const commitsDiff = await GitUtils.getCommitsDiff(workspacePath, baseBranch);
+    const status = await getWorkspaceStatus(workspacePath);
+    const commitsDiff = await getCommitsDiff(workspacePath, baseBranch);
 
     const workspace: Workspace = {
       id: workspaceId,
@@ -143,7 +149,7 @@ export async function createCommand(
         const workspacePath = join(project.workspacesPath, workspaceName);
         
         if (existsSync(workspacePath)) {
-          await GitUtils.removeWorktree(project.bareRepoPath, workspacePath);
+          await removeWorktree(project.bareRepoPath, workspacePath);
         }
       }
     } catch {
