@@ -4,7 +4,9 @@ import { join } from 'path';
 import inquirer from 'inquirer';
 import type { CommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
+import { ConfigManager } from '../core/config.js';
 import { GitUtils, parseDuration } from '../utils/git.js';
+import { SafeScriptExecutor } from '../utils/script-executor.js';
 
 export async function cleanCommand(
   workspace?: string,
@@ -273,6 +275,17 @@ async function shouldCleanWorkspace(
 }
 
 async function removeWorkspace(workspace: Workspace, project: Project, db: DatabaseManager): Promise<void> {
+  const configManager = new ConfigManager();
+  const globalConfig = configManager.getConfig();
+  const projectConfig = configManager.getProjectConfig(workspace.projectName);
+  const scriptConfig = projectConfig.scripts || globalConfig.scripts;
+
+  // Execute pre_clean hooks (e.g., stop containers, cleanup resources)
+  if (scriptConfig) {
+    const context = SafeScriptExecutor.createContext(workspace, project);
+    await SafeScriptExecutor.executePreCleanHooks(context, scriptConfig, { force: true });
+  }
+
   let directoryRemoved = false;
 
   // Try to remove via git worktree first
@@ -299,6 +312,12 @@ async function removeWorkspace(workspace: Workspace, project: Project, db: Datab
 
   // Always remove from database, even if directory removal failed
   db.removeWorkspace(workspace.id);
+
+  // Execute post_clean hooks (e.g., cleanup external resources)
+  if (scriptConfig) {
+    const context = SafeScriptExecutor.createContext(workspace, project);
+    await SafeScriptExecutor.executePostCleanHooks(context, scriptConfig, { force: true });
+  }
 
   if (directoryRemoved) {
     console.log(chalk.green(`✓ Cleaned workspace '${workspace.name}'`));

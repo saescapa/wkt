@@ -249,6 +249,8 @@ export interface ScriptConfig {
     post_create?: ScriptHook[];
     pre_switch?: ScriptHook[];
     post_switch?: ScriptHook[];
+    pre_clean?: ScriptHook[];
+    post_clean?: ScriptHook[];
   };
   
   // Named script shortcuts
@@ -257,6 +259,10 @@ export interface ScriptConfig {
   // Workspace-specific overrides
   workspace_scripts?: Record<string, {
     post_create?: ScriptHook[];
+    pre_switch?: ScriptHook[];
+    post_switch?: ScriptHook[];
+    pre_clean?: ScriptHook[];
+    post_clean?: ScriptHook[];
     scripts?: Record<string, ScriptDefinition>;
   }>;
 }

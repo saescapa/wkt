@@ -181,7 +181,52 @@ scripts:
       optional: true
       background: true
 
-  # Scripts that run automatically after workspace creation
+    # Container lifecycle scripts for workspace isolation
+    # These enable per-workspace containers (Docker, Podman, OrbStack, etc.)
+    docker-up:
+      name: "Start Containers"
+      command: ["docker", "compose", "-p", "{{workspace_name}}", "up", "-d"]
+      description: "Start workspace-specific containers with isolated project name"
+      conditions:
+        file_exists: ["docker-compose.yml"]
+      optional: true
+      env:
+        COMPOSE_PROJECT_NAME: "{{workspace_name}}"
+
+    docker-down:
+      name: "Stop Containers"
+      command: ["docker", "compose", "-p", "{{workspace_name}}", "down"]
+      description: "Stop workspace-specific containers"
+      conditions:
+        file_exists: ["docker-compose.yml"]
+      optional: true
+      env:
+        COMPOSE_PROJECT_NAME: "{{workspace_name}}"
+
+    docker-logs:
+      name: "Container Logs"
+      command: ["docker", "compose", "-p", "{{workspace_name}}", "logs", "-f"]
+      description: "Follow logs from workspace containers"
+      conditions:
+        file_exists: ["docker-compose.yml"]
+      env:
+        COMPOSE_PROJECT_NAME: "{{workspace_name}}"
+
+    cleanup-db-branch:
+      name: "Cleanup Database Branch"
+      command: ["pscale", "branch", "delete", "{{project_name}}", "{{branch_name}}", "--force"]
+      description: "Delete PlanetScale database branch when cleaning workspace"
+      conditions:
+        file_exists: ["planetscale.yml"]
+      optional: true
+
+  # Scripts that run automatically during workspace lifecycle
+  # Available hooks:
+  #   - post_create: After workspace is created
+  #   - pre_switch: Before switching AWAY from a workspace (teardown)
+  #   - post_switch: After switching TO a workspace (setup)
+  #   - pre_clean: Before a workspace is removed (cleanup)
+  #   - post_clean: After a workspace is removed (external cleanup)
   hooks:
     post_create:
       - script: "install-deps"
@@ -192,15 +237,38 @@ scripts:
       - script: "create-db-branch"
         variables:
           branch_name: "{{workspace_name}}"  # Use workspace name for DB branch
+      - script: "docker-up"  # Start containers after creating workspace
+
+    # Container lifecycle: stop services when switching away
+    pre_switch:
+      - script: "docker-down"
+        optional: true  # Don't fail if containers aren't running
+
+    # Container lifecycle: start services when switching to workspace
+    post_switch:
+      - script: "docker-up"
+        optional: true
+
+    # Cleanup before removing workspace
+    pre_clean:
+      - script: "docker-down"
+        optional: true
+      - script: "cleanup-db-branch"
+        optional: true
 
   # Named shortcuts for convenience
   shortcuts:
     i: "install-deps"
-    build: "build-project"  
+    build: "build-project"
     db: "create-db-branch"
     docker: "setup-docker-env"
+    up: "docker-up"
+    down: "docker-down"
+    logs: "docker-logs"
 
   # Workspace-specific script overrides
+  # Patterns can match workspace name or branch name
+  # All lifecycle hooks (post_create, pre_switch, post_switch, pre_clean, post_clean) can be workspace-specific
   workspace_scripts:
     # Feature branches get additional development setup
     "feature/*":
@@ -210,6 +278,18 @@ scripts:
         - script: "create-db-branch"
           variables:
             branch_name: "dev-{{workspace_name}}"
+        - script: "docker-up"
+      pre_switch:
+        - script: "docker-down"
+          optional: true
+      post_switch:
+        - script: "docker-up"
+          optional: true
+      pre_clean:
+        - script: "docker-down"
+          optional: true
+        - script: "cleanup-db-branch"
+          optional: true
       scripts:
         dev-server:
           name: "Development Server"
@@ -217,19 +297,25 @@ scripts:
           description: "Start development server with hot reload"
           background: true
 
-    # Staging workspaces use different database
+    # Staging workspaces use different database and containers
     "*staging*":
+      post_switch:
+        - script: "docker-up"
+          optional: true
+      pre_switch:
+        - script: "docker-down"
+          optional: true
       scripts:
         create-db-branch:
           name: "Create Staging Database Branch"
           command: ["pscale", "branch", "create", "{{project_name}}", "staging-{{workspace_name}}"]
           description: "Create staging database branch"
 
-    # Production-like branches need special handling  
+    # Production-like branches need special handling
     "hotfix/*":
       post_create:
         - script: "install-deps"
-        # Skip automatic build for hotfixes - manual verification required
+        # Skip automatic containers for hotfixes - manual verification required
       scripts:
         create-db-branch:
           name: "Create Hotfix Database Branch"

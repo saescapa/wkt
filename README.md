@@ -13,6 +13,7 @@ A flexible CLI tool for managing multiple project working directories using git 
 - **🆕 Smart workspace detection** - Automatically detects current workspace from directory path
 - **🆕 Interactive script selection** - Choose scripts from a beautiful menu interface
 - **🆕 Hierarchical configuration** - Global, project, and workspace-level script configurations
+- **🆕 Lifecycle hooks** - Run scripts on create, switch, and clean for container/environment management
 - **Smart automation** - Branch name inference, auto-cleanup, conflict prevention
 - **Rich CLI experience** - Interactive selection, fuzzy search, colored output
 
@@ -456,13 +457,22 @@ scripts:
         file_exists: [".env.local"]
       optional: true    # Won't fail workspace creation
 
-  # Scripts that run automatically
+  # Scripts that run automatically during workspace lifecycle
   hooks:
-    post_create:
+    post_create:      # After workspace is created
       - script: "install-deps"
       - script: "create-db-branch"
         variables:
           branch_name: "{{workspace_name}}"
+    pre_switch:       # Before switching away (teardown)
+      - script: "docker-down"
+        optional: true
+    post_switch:      # After switching to workspace (setup)
+      - script: "docker-up"
+        optional: true
+    pre_clean:        # Before workspace is removed
+      - script: "docker-down"
+        optional: true
 
   # Convenient shortcuts
   shortcuts:
@@ -691,7 +701,6 @@ local_files:
 - Zsh completions
 - Workspace templates
 - SQLite database (currently using JSON)
-- Pre/post switch hooks
 - Script scheduling and background job management
 
 ## Testing
