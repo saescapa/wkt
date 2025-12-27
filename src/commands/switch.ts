@@ -1,15 +1,16 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import Fuse from 'fuse.js';
-import type { CommandOptions, Workspace } from '../core/types.js';
+import type { SwitchCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
 import { ErrorHandler, WorkspaceNotFoundError } from '../utils/errors.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
+import { formatTimeAgo } from '../utils/format.js';
 
 export async function switchCommand(
   workspaceName?: string,
-  options: CommandOptions = {}
+  options: SwitchCommandOptions = {}
 ): Promise<void> {
   try {
     const dbManager = new DatabaseManager();
@@ -256,18 +257,3 @@ function formatWorkspaceChoice(workspace: Workspace): string {
   return choice;
 }
 
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 60) {
-    return `${diffMins}m ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  } else {
-    return `${diffDays}d ago`;
-  }
-}

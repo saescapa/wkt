@@ -140,23 +140,3 @@ async function getWorkspacesToSync(databaseManager: DatabaseManager, options: Sy
 
   return workspaces;
 }
-
-export function showSyncHelp(): void {
-  console.log(chalk.blue('WKT Sync Commands:'));
-  console.log();
-  console.log('  wkt sync                     Sync all workspaces interactively');
-  console.log('  wkt sync --all               Sync all workspaces without confirmation');
-  console.log('  wkt sync --project <name>    Sync all workspaces in project');
-  console.log('  wkt sync --workspace <name>  Sync specific workspace');
-  console.log('  wkt sync --dry               Show what would be synced (dry run)');
-  console.log();
-  console.log('Options:');
-  console.log('  --force                      Skip confirmation prompts');
-  console.log('  --dry                        Show what would happen without making changes');
-  console.log('  --all                        Sync all workspaces');
-  console.log();
-  console.log('Examples:');
-  console.log('  wkt sync --project midnights --dry    # Preview sync for midnights project');
-  console.log('  wkt sync --workspace main --force     # Force sync main workspace');
-  console.log('  wkt sync --all                        # Sync everything');
-}

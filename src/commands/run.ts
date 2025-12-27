@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import type { CommandOptions, Workspace, ScriptConfig, ScriptDefinition } from '../core/types.js';
+import type { RunCommandOptions, Workspace, ScriptConfig, ScriptDefinition } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
@@ -8,7 +8,7 @@ import { SafeScriptExecutor } from '../utils/script-executor.js';
 export async function runCommand(
   scriptName?: string,
   workspaceIdentifier?: string,
-  options: CommandOptions = {}
+  options: RunCommandOptions = {}
 ): Promise<void> {
   const dbManager = new DatabaseManager();
   const configManager = new ConfigManager();

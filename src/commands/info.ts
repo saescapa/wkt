@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { DatabaseManager } from '../core/database.js';
 import { ErrorHandler } from '../utils/errors.js';
+import { formatTimeAgo } from '../utils/format.js';
 
 interface InfoCommandOptions {
   descriptionOnly?: boolean;
@@ -126,31 +127,11 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
     const now = new Date();
     const daysSinceCreation = Math.floor((now.getTime() - workspace.createdAt.getTime()) / (1000 * 60 * 60 * 24));
     console.log(`${chalk.gray('Created:')}      ${workspace.createdAt.toLocaleDateString()} (${daysSinceCreation}d ago)`);
-    console.log(`${chalk.gray('Last used:')}    ${formatTimeAgo(workspace.lastUsed)}`);
+    console.log(`${chalk.gray('Last used:')}    ${formatTimeAgo(workspace.lastUsed, 'long')}`);
 
     console.log();
 
   } catch (error) {
     ErrorHandler.handle(error, 'workspace info');
-  }
-}
-
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) {
-    return 'just now';
-  } else if (diffMins < 60) {
-    return `${diffMins} minutes ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hours ago`;
-  } else if (diffDays === 1) {
-    return 'yesterday';
-  } else {
-    return `${diffDays} days ago`;
   }
 }

@@ -524,14 +524,51 @@ export class GitUtils {
       // Get the date of the last commit on the branch
       const result = await this.executeCommand(['git', 'log', '-1', '--format=%ct', branchName], bareRepoPath);
       const timestamp = parseInt(result.trim(), 10);
-      
+
       if (isNaN(timestamp)) {
         return null;
       }
-      
+
       return new Date(timestamp * 1000);
     } catch {
       return null;
+    }
+  }
+
+  static async getLastCommitInfo(repoPath: string, branchName?: string): Promise<{ message: string; date: Date; hash: string } | null> {
+    try {
+      const ref = branchName || 'HEAD';
+      const result = await this.executeCommand(
+        ['git', 'log', '-1', '--format=%H%n%ct%n%s', ref],
+        repoPath
+      );
+      const lines = result.trim().split('\n');
+      if (lines.length < 3) return null;
+
+      const hash = lines[0]?.substring(0, 7) || '';
+      const timestamp = parseInt(lines[1] || '0', 10);
+      const message = lines[2] || '';
+
+      return {
+        hash,
+        date: new Date(timestamp * 1000),
+        message: message.length > 60 ? message.substring(0, 57) + '...' : message
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  static async getCommitCountAhead(workspacePath: string, baseBranch: string): Promise<number> {
+    try {
+      const currentBranch = await this.getCurrentBranch(workspacePath);
+      const result = await this.executeCommand(
+        ['git', 'rev-list', '--count', `${baseBranch}..${currentBranch}`],
+        workspacePath
+      );
+      return parseInt(result.trim(), 10) || 0;
+    } catch {
+      return 0;
     }
   }
 }

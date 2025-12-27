@@ -1,182 +1,106 @@
-# WKT (Worktree Kit)
+# WKT
 
-A CLI tool for managing parallel development workflows using git worktrees.
+Workspace manager for git repositories. Create isolated development environments with shared configuration.
 
-**Why WKT?**
-- No more `git clone` overload — one bare repo, unlimited workspaces
-- Local files (`.env`, configs) preserved across branches
-- Parallel work on multiple features without stashing
+## Features
 
-## Installation
+- **Workspaces** — Parallel branches via git worktrees
+- **Local Files** — Shared configs (`.env`, IDE settings) across workspaces
+- **Lifecycle Hooks** — Auto-run scripts on create, switch, clean
+- **Fuzzy Navigation** — Quick switching with search
+
+## Install
 
 ```bash
 git clone https://github.com/user/wkt.git
-cd wkt
-bun install
-bun run build
-npm link  # Make globally available
+cd wkt && bun install && bun run build && npm link
 ```
 
-## Quick Start
+## Usage
 
 ```bash
-# Initialize a project
-wkt init git@github.com:user/repo.git myproject
-
-# Create workspaces
-wkt create myproject feature/auth
-wkt create myproject 1234  # Inferred: feature/eng-1234
-
-# Switch between workspaces
-wkt switch                      # Interactive selection
-wkt switch auth                 # Fuzzy match
-cd "$(wkt switch auth --path-only)"  # Shell integration
-
-# List and clean up
-wkt list
-wkt clean  # Remove merged branches
+wkt init <repo-url> [project-name]    # Initialize project
+wkt create <project> <branch>          # Create workspace
+wkt switch [name]                      # Switch workspace
+wkt list                               # List workspaces
+wkt clean                              # Remove merged branches
 ```
 
 ## Commands
 
-### Setup
-
 | Command | Description |
 |---------|-------------|
-| `wkt init <url> [name]` | Initialize project from repository |
-| `wkt init --list` | List all managed projects |
-| `wkt config` | View/edit configuration |
+| `init <url>` | Initialize project from repository |
+| `create <project> <branch>` | Create workspace |
+| `switch [name]` | Switch workspace (interactive if omitted) |
+| `list` | List all workspaces |
+| `list --dirty` | Workspaces with uncommitted changes |
+| `list --stale <duration>` | Workspaces older than duration |
+| `clean` | Remove merged workspaces |
+| `clean --older-than <duration>` | Remove stale workspaces |
+| `info` | Current workspace details |
+| `rename <name>` | Rename/recycle workspace |
+| `run [script]` | Execute configured script |
+| `sync` | Sync local files |
+| `config` | View/edit configuration |
 
-### Workspace Management
+## Configuration
 
-| Command | Description |
-|---------|-------------|
-| `wkt create <project> <branch>` | Create new workspace |
-| `wkt switch [workspace]` | Switch to workspace (interactive if no arg) |
-| `wkt list` | List all workspaces |
-| `wkt clean` | Remove merged workspaces |
-| `wkt rename <new-name>` | Rename current workspace/branch |
-
-### Workspace Info
-
-| Command | Description |
-|---------|-------------|
-| `wkt info` | Show current workspace details |
-| `wkt info -d "text"` | Set workspace description |
-| `wkt info --json` | Output as JSON |
-
-### Execution
-
-| Command | Description |
-|---------|-------------|
-| `wkt run [script]` | Run predefined script |
-| `wkt sync` | Sync local files to workspaces |
-
-## Local Files
-
-Keep files synced across workspaces. Add to `~/.wkt/config.yaml`:
+`~/.wkt/config.yaml`
 
 ```yaml
 local_files:
-  shared:              # Symlinked to main workspace
-    - "CLAUDE.md"
+  shared:                          # Symlinked from main workspace
     - ".cursor/rules"
-  copied:              # Copied from template
+    - "docs.local/"
+  copied:                          # Copied per workspace
     - ".env.local"
   templates:
-    ".env.local": ".env.local.example"
-```
+    ".env.local": ".env.example"   # Template mapping
 
-**Shared files** are symlinked — edit once, available everywhere.
-**Copied files** are workspace-specific — each gets its own copy.
-
-## Lifecycle Hooks
-
-Run scripts on workspace events:
-
-```yaml
 scripts:
   scripts:
-    install-deps:
+    install:
       command: ["pnpm", "install"]
       conditions:
         file_exists: ["package.json"]
-    docker-up:
-      command: ["docker", "compose", "up", "-d"]
-
   hooks:
     post_create:
-      - script: "install-deps"
+      - script: "install"
     post_switch:
-      - script: "docker-up"
+      - script: "install"
         optional: true
 ```
 
 ## Shell Integration
 
-Add to your `.zshrc` or `.bashrc`:
-
 ```bash
-# Switch and cd in one command
-function wkts() {
-    local path=$(wkt switch "$@" --path-only)
-    if [ $? -eq 0 ] && [ -n "$path" ]; then
-        cd "$path"
-    fi
-}
-
-# Show workspace description in prompt
-wkt_info() {
-  local desc=$(wkt info --description-only 2>/dev/null)
-  [ -n "$desc" ] && echo " [$desc]"
+# Add to .zshrc/.bashrc
+wkts() {
+  local path=$(wkt switch "$@" --path-only)
+  [ $? -eq 0 ] && [ -n "$path" ] && cd "$path"
 }
 ```
 
-## Configuration
-
-WKT stores data in `~/.wkt/`:
+## Structure
 
 ```
 ~/.wkt/
-├── config.yaml      # Global configuration
-├── database.json    # Workspace metadata
-├── projects/        # Bare repositories
-└── workspaces/      # All worktrees
-```
-
-### Branch Inference
-
-Shortcuts for common patterns:
-
-```yaml
-inference:
-  patterns:
-    - pattern: '^(\d+)$'
-      template: 'feature/eng-{}'  # 1234 → feature/eng-1234
-    - pattern: '^eng-(\d+)$'
-      template: 'feature/{}'      # eng-1234 → feature/eng-1234
-```
-
-## Directory Structure
-
-```
-~/.wkt/workspaces/myproject/
-├── main/
-│   ├── CLAUDE.md              # Original shared file
-│   └── .env.local             # Workspace-specific
-└── feature-auth/
-    ├── CLAUDE.md -> ../main/CLAUDE.md  # Symlink
-    └── .env.local             # Independent copy
+├── config.yaml        # Configuration
+├── database.json      # Workspace metadata
+├── projects/          # Bare repositories
+└── workspaces/        # Worktrees
+    └── <project>/
+        ├── main/
+        └── feature-xyz/
 ```
 
 ## Development
 
 ```bash
-bun run dev          # Run from source
-bun run build        # Build for production
-bun test             # Run tests
-bun run typecheck    # Type check
-bun run lint         # Lint
+bun run dev       # Run from source
+bun run build     # Build
+bun test          # Test
 ```
 
 ## License

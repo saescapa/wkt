@@ -3,14 +3,15 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import type { 
-  Project, 
-  Workspace, 
-  ScriptConfig, 
-  ScriptDefinition, 
+import type {
+  Project,
+  Workspace,
+  ScriptConfig,
+  ScriptDefinition,
   ScriptHook,
-  CommandOptions 
+  RunCommandOptions
 } from '../core/types.js';
+import { DEFAULT_ALLOWED_COMMANDS, DEFAULT_SCRIPT_TIMEOUT } from './constants.js';
 
 interface ExecutionContext {
   workspace: Workspace;
@@ -19,16 +20,6 @@ interface ExecutionContext {
 }
 
 export class SafeScriptExecutor {
-  private static DEFAULT_ALLOWED_COMMANDS = [
-    'pnpm', 'npm', 'yarn', 'bun',
-    'node', 'tsx', 'ts-node',
-    'git', 'docker', 'docker-compose',
-    'planetscale', 'pscale',  // PlanetScale CLI
-    'make', 'cmake',
-    './scripts/', '../scripts/', 'scripts/'  // Local script directories
-  ];
-
-  private static DEFAULT_TIMEOUT = 120000; // 2 minutes
 
   /**
    * Execute a predefined script safely
@@ -37,7 +28,7 @@ export class SafeScriptExecutor {
     scriptName: string,
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<boolean> {
     const script = this.findScript(scriptName, context.workspace, scriptConfig);
     if (!script) {
@@ -89,7 +80,7 @@ export class SafeScriptExecutor {
   static async executePostCreationHooks(
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('post_create', context, scriptConfig);
 
@@ -117,7 +108,7 @@ export class SafeScriptExecutor {
   static async executePreSwitchHooks(
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('pre_switch', context, scriptConfig);
 
@@ -145,7 +136,7 @@ export class SafeScriptExecutor {
   static async executePostSwitchHooks(
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('post_switch', context, scriptConfig);
 
@@ -173,7 +164,7 @@ export class SafeScriptExecutor {
   static async executePreCleanHooks(
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('pre_clean', context, scriptConfig);
 
@@ -201,7 +192,7 @@ export class SafeScriptExecutor {
   static async executePostCleanHooks(
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('post_clean', context, scriptConfig);
 
@@ -230,7 +221,7 @@ export class SafeScriptExecutor {
     hook: ScriptHook,
     context: ExecutionContext,
     scriptConfig: ScriptConfig,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<boolean> {
     const script = this.findScript(hook.script, context.workspace, scriptConfig);
     if (!script) {
@@ -348,7 +339,7 @@ export class SafeScriptExecutor {
    * Check if a command is allowed
    */
   private static isCommandAllowed(command: string, allowedCommands?: string[]): boolean {
-    const allowed = allowedCommands || this.DEFAULT_ALLOWED_COMMANDS;
+    const allowed = allowedCommands || [...DEFAULT_ALLOWED_COMMANDS];
     
     return allowed.some(allowedCmd => {
       // Exact match
@@ -413,7 +404,7 @@ export class SafeScriptExecutor {
   static async runScript(
     script: ScriptDefinition,
     context: ExecutionContext,
-    options: CommandOptions = {}
+    options: RunCommandOptions = {}
   ): Promise<boolean> {
     const workingDir = script.working_dir 
       ? resolve(context.workspace.path, script.working_dir)
@@ -426,7 +417,7 @@ export class SafeScriptExecutor {
     }
 
     const command = this.substituteVariables(script.command, context.variables);
-    const timeout = script.timeout || options.timeout || this.DEFAULT_TIMEOUT;
+    const timeout = script.timeout || options.timeout || DEFAULT_SCRIPT_TIMEOUT;
 
     console.log(chalk.blue(`Running: ${script.name || command.join(' ')}`));
     console.log(chalk.gray(`  Working directory: ${workingDir}`));

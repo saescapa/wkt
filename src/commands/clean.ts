@@ -2,15 +2,26 @@ import chalk from 'chalk';
 import { existsSync, rmSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import inquirer from 'inquirer';
-import type { CommandOptions, Workspace, Project } from '../core/types.js';
+import type { CleanCommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
 import { GitUtils, parseDuration } from '../utils/git.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
+import { formatTimeAgo } from '../utils/format.js';
+
+interface CleanCheckResult {
+  clean: boolean;
+  reason: string;
+  canForce: boolean;
+  details?: {
+    commitsAhead?: number;
+    lastCommit?: { message: string; date: Date; hash: string };
+  };
+}
 
 export async function cleanCommand(
   workspace?: string,
-  options: CommandOptions = {}
+  options: CleanCommandOptions = {}
 ): Promise<void> {
   const db = new DatabaseManager();
   
@@ -34,7 +45,7 @@ export async function cleanCommand(
 async function cleanSingleWorkspace(
   workspaceName: string,
   db: DatabaseManager,
-  options: CommandOptions
+  options: CleanCommandOptions
 ): Promise<void> {
   const allWorkspaces = db.getAllWorkspaces();
   const workspace = allWorkspaces.find(w => w.name === workspaceName);
@@ -53,13 +64,12 @@ async function cleanSingleWorkspace(
   // Check if workspace should be cleaned based on criteria
   const shouldClean = await shouldCleanWorkspace(workspace, project, options);
   if (!shouldClean.clean) {
-    console.log(chalk.yellow(`⚠️  ${shouldClean.reason}`));
+    displayCleanWarning(shouldClean, workspace.name);
     if (!options.force && shouldClean.canForce) {
-      console.log(chalk.gray(`   Use --force to override this protection`));
       return;
     }
     if (shouldClean.canForce) {
-      console.log(chalk.yellow(`🔥 Force cleaning workspace...`));
+      console.log(chalk.yellow(`\n🔥 Force cleaning workspace...`));
     } else {
       return;
     }
@@ -70,7 +80,7 @@ async function cleanSingleWorkspace(
 
 async function cleanAllWorkspaces(
   db: DatabaseManager,
-  options: CommandOptions
+  options: CleanCommandOptions
 ): Promise<void> {
   const allWorkspaces = db.getAllWorkspaces();
 
@@ -201,10 +211,10 @@ function isMainBranchWorkspace(workspace: Workspace, project: Project): boolean 
 }
 
 async function shouldCleanWorkspace(
-  workspace: Workspace, 
-  project: Project, 
-  options: CommandOptions
-): Promise<{ clean: boolean; reason: string; canForce: boolean }> {
+  workspace: Workspace,
+  project: Project,
+  options: CleanCommandOptions
+): Promise<CleanCheckResult> {
   // Protect main branch workspaces (they contain shared files)
   if (isMainBranchWorkspace(workspace, project)) {
     return {
@@ -218,16 +228,29 @@ async function shouldCleanWorkspace(
   if (options.merged) {
     try {
       const isMerged = await GitUtils.isBranchMerged(
-        project.bareRepoPath, 
-        workspace.branchName, 
+        project.bareRepoPath,
+        workspace.branchName,
         project.defaultBranch
       );
-      
+
       if (!isMerged) {
+        // Gather additional details for unmerged branches
+        const details: CleanCheckResult['details'] = {};
+
+        // Get commit count ahead
+        if (existsSync(workspace.path)) {
+          details.commitsAhead = await GitUtils.getCommitCountAhead(
+            workspace.path,
+            project.defaultBranch
+          );
+          details.lastCommit = await GitUtils.getLastCommitInfo(workspace.path) || undefined;
+        }
+
         return {
           clean: false,
-          reason: `Branch '${workspace.branchName}' is not merged into ${project.defaultBranch}`,
-          canForce: true
+          reason: `Unmerged work detected`,
+          canForce: true,
+          details
         };
       }
     } catch {
@@ -244,7 +267,7 @@ async function shouldCleanWorkspace(
     try {
       const maxAge = parseDuration(options.olderThan);
       const branchAge = await GitUtils.getBranchAge(project.bareRepoPath, workspace.branchName);
-      
+
       if (!branchAge) {
         return {
           clean: false,
@@ -252,7 +275,7 @@ async function shouldCleanWorkspace(
           canForce: true
         };
       }
-      
+
       const ageMs = Date.now() - branchAge.getTime();
       if (ageMs < maxAge) {
         const days = Math.floor(ageMs / (24 * 60 * 60 * 1000));
@@ -272,6 +295,32 @@ async function shouldCleanWorkspace(
   }
 
   return { clean: true, reason: '', canForce: false };
+}
+
+function displayCleanWarning(result: CleanCheckResult, workspaceName: string): void {
+  console.log(chalk.yellow(`\n⚠️  ${result.reason}`));
+
+  if (result.details) {
+    const { commitsAhead, lastCommit } = result.details;
+
+    console.log();
+    console.log(chalk.gray(`   Workspace: ${workspaceName}`));
+
+    if (commitsAhead !== undefined && commitsAhead > 0) {
+      console.log(chalk.gray(`   Commits:   ${chalk.cyan(`${commitsAhead} ahead`)} of main`));
+    }
+
+    if (lastCommit) {
+      console.log(chalk.gray(`   Last:      "${lastCommit.message}" (${formatTimeAgo(lastCommit.date)})`));
+    }
+
+    console.log();
+    console.log(chalk.gray(`   This workspace has changes that haven't been merged.`));
+  }
+
+  if (result.canForce) {
+    console.log(chalk.gray(`\n   Use --force to override this protection`));
+  }
 }
 
 async function removeWorkspace(workspace: Workspace, project: Project, db: DatabaseManager): Promise<void> {
@@ -371,7 +420,7 @@ async function findOrphanedDirectories(db: DatabaseManager): Promise<Array<{ pro
 
 async function handleOrphanedDirectories(
   orphanedDirs: Array<{ projectName: string; dirName: string; fullPath: string }>,
-  _options: CommandOptions
+  _options: CleanCommandOptions
 ): Promise<void> {
   console.log(chalk.cyan(`\nFound ${orphanedDirs.length} orphaned workspace directories:`));
 
