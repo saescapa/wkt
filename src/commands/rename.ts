@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
-import type { CommandOptions, Workspace } from '../core/types.js';
+import type { CommandOptions } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
@@ -144,7 +144,7 @@ export async function renameCommand(
         try {
           await GitUtils.rebaseBranch(workspace.path, baseBranch);
           console.log(chalk.green('✓ Updated to latest base branch'));
-        } catch (error) {
+        } catch {
           console.log(chalk.yellow(`⚠️  Could not update from ${baseBranch}, continuing anyway...`));
         }
       }
@@ -178,7 +178,7 @@ export async function renameCommand(
               type: 'input',
               name: 'newName',
               message: 'Enter new branch name:',
-              validate: (input: string) => input.trim().length > 0 || 'Branch name cannot be empty',
+              validate: (input: string): boolean | string => input.trim().length > 0 || 'Branch name cannot be empty',
             },
           ]);
 
