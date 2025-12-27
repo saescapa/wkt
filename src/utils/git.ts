@@ -236,7 +236,7 @@ export class GitUtils {
         // Origin doesn't exist, add it
         await this.executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
       }
-    } catch (error) {
+    } catch {
       console.warn('Warning: Could not configure origin remote in worktree');
     }
 
@@ -514,7 +514,7 @@ export class GitUtils {
         const branchSearch = branchName.toLowerCase();
         return recentCommits.toLowerCase().includes(branchSearch);
       }
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -530,7 +530,7 @@ export class GitUtils {
       }
       
       return new Date(timestamp * 1000);
-    } catch (error) {
+    } catch {
       return null;
     }
   }

@@ -271,7 +271,7 @@ export class LocalFilesManager {
       }
       
       writeFileSync(targetPath, content);
-    } catch (error) {
+    } catch {
       // If it's a binary file or encoding issue, copy as-is
       try {
         copyFileSync(sourcePath, targetPath);

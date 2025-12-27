@@ -287,9 +287,9 @@ async function selectScriptInteractively(workspace: Workspace, scriptConfig: Scr
 }
 
 function mergeScriptConfigs(
-  globalScripts?: any,
-  projectScripts?: any,
-  workspaceScripts?: any
+  globalScripts?: Partial<ScriptConfig>,
+  projectScripts?: Partial<ScriptConfig>,
+  workspaceScripts?: Partial<ScriptConfig>
 ): ScriptConfig {
   const defaultConfig: ScriptConfig = {
     scripts: {},

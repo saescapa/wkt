@@ -2,7 +2,7 @@ import { join, basename } from 'path';
 import { existsSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import type { InitCommandOptions, Project, ProjectConfig } from '../core/types.js';
+import type { InitCommandOptions, Project } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
@@ -52,7 +52,7 @@ export async function initCommand(
           inferredProjectName = basename(process.cwd());
         }
         console.log(chalk.blue(`Found git repository: ${repoUrl}`));
-      } catch (error) {
+      } catch {
         console.error(chalk.red('Error: Current directory is not a valid git repository or has no remote origin.'));
         console.log('Usage: wkt init <repository-url> [project-name]');
         process.exit(1);
@@ -120,7 +120,7 @@ export async function initCommand(
           name: 'template',
           message: 'Select a template:',
           choices: [...availableTemplates, new inquirer.Separator(), { name: 'None', value: undefined }],
-          when: (answers) => answers.useTemplate,
+          when: (answers): boolean => !!answers.useTemplate,
         },
       ]);
       selectedTemplate = answer.template;

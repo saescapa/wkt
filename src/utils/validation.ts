@@ -252,7 +252,7 @@ export function validateWorkspacePattern(pattern: string): void {
   try {
     // Test if the pattern can be compiled as a regex
     new RegExp(pattern.replace(/\*/g, '.*'));
-  } catch (error) {
+  } catch {
     throw new ValidationError('workspace pattern', 'is not a valid pattern');
   }
 }

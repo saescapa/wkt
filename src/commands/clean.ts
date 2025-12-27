@@ -230,7 +230,7 @@ async function shouldCleanWorkspace(
           canForce: true
         };
       }
-    } catch (error) {
+    } catch {
       return {
         clean: false,
         reason: `Could not check merge status for '${workspace.branchName}'`,
@@ -262,7 +262,7 @@ async function shouldCleanWorkspace(
           canForce: true
         };
       }
-    } catch (error) {
+    } catch {
       return {
         clean: false,
         reason: `Invalid duration format: ${options.olderThan}`,
@@ -361,7 +361,7 @@ async function findOrphanedDirectories(db: DatabaseManager): Promise<Array<{ pro
           });
         }
       }
-    } catch (error) {
+    } catch {
       console.log(chalk.yellow(`Warning: Could not read directories in ${project.workspacesPath}`));
     }
   }
@@ -371,7 +371,7 @@ async function findOrphanedDirectories(db: DatabaseManager): Promise<Array<{ pro
 
 async function handleOrphanedDirectories(
   orphanedDirs: Array<{ projectName: string; dirName: string; fullPath: string }>,
-  options: CommandOptions
+  _options: CommandOptions
 ): Promise<void> {
   console.log(chalk.cyan(`\nFound ${orphanedDirs.length} orphaned workspace directories:`));
 
