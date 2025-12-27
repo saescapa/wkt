@@ -1,13 +1,13 @@
 # WKT
 
-Workspace manager for git repositories. Create isolated development environments with shared configuration.
+Workspace manager for git repositories. Create isolated development environments using git worktrees.
 
 ## Features
 
-- **Workspaces** — Parallel branches via git worktrees
-- **Local Files** — Shared configs (`.env`, IDE settings) across workspaces
-- **Lifecycle Hooks** — Auto-run scripts on create, switch, clean
-- **Fuzzy Navigation** — Quick switching with search
+- **Workspaces** - Parallel branches via git worktrees
+- **Local Files** - Shared configs (`.env`, IDE settings) across workspaces
+- **Lifecycle Hooks** - Auto-run scripts on create, switch, clean
+- **Fuzzy Navigation** - Quick switching with search
 
 ## Install
 
@@ -16,14 +16,16 @@ git clone https://github.com/user/wkt.git
 cd wkt && bun install && bun run build && npm link
 ```
 
-## Usage
+Requires Node.js >= 20 and Bun.
+
+## Quick Start
 
 ```bash
-wkt init <repo-url> [project-name]    # Initialize project
-wkt create <project> <branch>          # Create workspace
-wkt switch [name]                      # Switch workspace
-wkt list                               # List workspaces
-wkt clean                              # Remove merged branches
+wkt init git@github.com:user/my-project.git   # Initialize project
+wkt create my-project feature/auth             # Create workspace
+wkt switch auth                                # Switch (fuzzy match)
+wkt list                                       # List workspaces
+wkt clean                                      # Remove merged branches
 ```
 
 ## Commands
@@ -34,43 +36,14 @@ wkt clean                              # Remove merged branches
 | `create <project> <branch>` | Create workspace |
 | `switch [name]` | Switch workspace (interactive if omitted) |
 | `list` | List all workspaces |
-| `list --dirty` | Workspaces with uncommitted changes |
-| `list --stale <duration>` | Workspaces older than duration |
 | `clean` | Remove merged workspaces |
-| `clean --older-than <duration>` | Remove stale workspaces |
-| `info` | Current workspace details |
 | `rename <name>` | Rename/recycle workspace |
+| `info` | Current workspace details |
 | `run [script]` | Execute configured script |
 | `sync` | Sync local files |
 | `config` | View/edit configuration |
 
-## Configuration
-
-`~/.wkt/config.yaml`
-
-```yaml
-local_files:
-  shared:                          # Symlinked from main workspace
-    - ".cursor/rules"
-    - "docs.local/"
-  copied:                          # Copied per workspace
-    - ".env.local"
-  templates:
-    ".env.local": ".env.example"   # Template mapping
-
-scripts:
-  scripts:
-    install:
-      command: ["pnpm", "install"]
-      conditions:
-        file_exists: ["package.json"]
-  hooks:
-    post_create:
-      - script: "install"
-    post_switch:
-      - script: "install"
-        optional: true
-```
+See `wkt <command> --help` for options.
 
 ## Shell Integration
 
@@ -82,18 +55,12 @@ wkts() {
 }
 ```
 
-## Structure
+## Documentation
 
-```
-~/.wkt/
-├── config.yaml        # Configuration
-├── database.json      # Workspace metadata
-├── projects/          # Bare repositories
-└── workspaces/        # Worktrees
-    └── <project>/
-        ├── main/
-        └── feature-xyz/
-```
+- [User Guide](docs/user-guide.md) - Complete usage documentation
+- [Configuration](docs/configuration.md) - Config file reference
+- [Architecture](docs/architecture.md) - Codebase overview
+- [Contributing](docs/contributing.md) - Development guide
 
 ## Development
 

@@ -100,3 +100,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# Local documentation
+*.local
