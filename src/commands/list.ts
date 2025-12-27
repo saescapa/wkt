@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import type { ListCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
+import { formatTimeAgo } from '../utils/format.js';
 
 export async function listCommand(options: ListCommandOptions = {}): Promise<void> {
   const dbManager = new DatabaseManager();
@@ -35,6 +36,39 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
 
     if (workspaces.length === 0) {
       console.log(chalk.yellow(`No workspaces found matching filter '${options.filter}'.`));
+      return;
+    }
+  }
+
+  // Filter by dirty (uncommitted changes)
+  if (options.dirty) {
+    workspaces = workspaces.filter(w => !w.status.clean);
+
+    if (workspaces.length === 0) {
+      console.log(chalk.green('No workspaces with uncommitted changes.'));
+      return;
+    }
+  }
+
+  // Filter by stale (older than specified duration)
+  if (options.stale) {
+    const { parseDuration } = await import('../utils/git.js');
+    try {
+      const maxAge = parseDuration(options.stale);
+      const now = Date.now();
+
+      workspaces = workspaces.filter(w => {
+        const age = now - w.lastUsed.getTime();
+        return age > maxAge;
+      });
+
+      if (workspaces.length === 0) {
+        console.log(chalk.green(`No workspaces older than ${options.stale}.`));
+        return;
+      }
+    } catch {
+      console.log(chalk.red(`Invalid duration format: ${options.stale}`));
+      console.log(chalk.gray('Use format like "30d", "2w", "6m", "1y"'));
       return;
     }
   }
@@ -254,23 +288,4 @@ function getStatusText(workspace: Workspace): string {
   return parts.join(', ');
 }
 
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) {
-    return 'just now';
-  } else if (diffMins < 60) {
-    return `${diffMins}m ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  } else if (diffDays === 1) {
-    return 'yesterday';
-  } else {
-    return `${diffDays}d ago`;
-  }
-}
 

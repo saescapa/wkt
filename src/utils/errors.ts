@@ -163,37 +163,3 @@ export class ErrorHandler {
     console.warn(chalk.yellow(`${prefix}: ${error.message}`));
   }
 }
-
-/**
- * Utility function for validating required parameters
- */
-export function validateRequired<T>(value: T | undefined | null, fieldName: string): T {
-  if (value === undefined || value === null) {
-    throw new ValidationError(fieldName, 'is required');
-  }
-  return value;
-}
-
-/**
- * Utility function for validating string length
- */
-export function validateStringLength(value: string, fieldName: string, min?: number, max?: number): void {
-  if (min !== undefined && value.length < min) {
-    throw new ValidationError(fieldName, `must be at least ${min} characters`);
-  }
-  if (max !== undefined && value.length > max) {
-    throw new ValidationError(fieldName, `must be no more than ${max} characters`);
-  }
-}
-
-/**
- * Utility function for validating file/directory paths
- */
-export function validatePath(path: string, fieldName: string): void {
-  if (path.includes('..')) {
-    throw new ValidationError(fieldName, 'cannot contain parent directory references (..)');
-  }
-  if (!path.startsWith('/') && !path.match(/^[a-zA-Z]:\\/)) {
-    throw new ValidationError(fieldName, 'must be an absolute path');
-  }
-}

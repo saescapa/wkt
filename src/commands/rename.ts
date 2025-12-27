@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
-import type { CommandOptions } from '../core/types.js';
+import type { RenameCommandOptions } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
@@ -15,7 +15,7 @@ import {
 
 export async function renameCommand(
   newName: string,
-  options: CommandOptions = {}
+  options: RenameCommandOptions = {}
 ): Promise<void> {
   try {
     const dbManager = new DatabaseManager();

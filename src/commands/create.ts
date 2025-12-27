@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
-import type { CommandOptions, Workspace } from '../core/types.js';
+import type { CreateCommandOptions, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { GitUtils } from '../utils/git.js';
@@ -18,7 +18,7 @@ import {
 export async function createCommand(
   projectName: string,
   branchName: string,
-  options: CommandOptions = {}
+  options: CreateCommandOptions = {}
 ): Promise<void> {
   try {
     const configManager = new ConfigManager();

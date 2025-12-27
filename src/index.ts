@@ -72,6 +72,8 @@ program
   .option('-p, --project <name>', 'List workspaces for specific project')
   .option('-d, --details', 'Show detailed information')
   .option('--filter <pattern>', 'Filter by pattern')
+  .option('--dirty', 'Show only workspaces with uncommitted changes')
+  .option('--stale <duration>', 'Show only workspaces older than duration (e.g., 30d, 2w)')
   .option('--group-by <field>', 'Group results by field', 'project')
   .option('-a, --all', 'Show all workspaces including inactive main branches')
   .action(listCommand);

@@ -145,6 +145,8 @@ export interface ListCommandOptions {
   filter?: string;
   groupBy?: string;
   all?: boolean;
+  dirty?: boolean;
+  stale?: string;
 }
 
 export interface CleanCommandOptions extends BaseCommandOptions {
@@ -167,38 +169,18 @@ export interface SyncCommandOptions extends BaseCommandOptions {
 
 export interface RunCommandOptions extends BaseCommandOptions {
   timeout?: number;
+  confirm?: boolean;
 }
 
 export interface InitCommandOptions {
   list?: boolean;
   template?: string;
-  applyTemplate?: boolean;  // For applying to existing projects
+  applyTemplate?: boolean;
 }
 
-// Legacy interface for backward compatibility - will be deprecated
-export interface CommandOptions extends BaseCommandOptions {
+export interface RenameCommandOptions extends BaseCommandOptions {
   from?: string;
   name?: string;
-  template?: string;
-  checkout?: boolean;
-  search?: boolean;
-  project?: string;
-  create?: boolean;
-  details?: boolean;
-  filter?: string;
-  groupBy?: string;
-  all?: boolean;
-  merged?: boolean;
-  olderThan?: string;
-  list?: boolean;
-  pathOnly?: boolean;
-  // Script execution options
-  confirm?: boolean;
-  background?: boolean;
-  timeout?: number;
-  workspace?: string;
-  global?: boolean;
-  // Recycle options
   rebase?: boolean;
   description?: string;
 }
