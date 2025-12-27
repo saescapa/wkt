@@ -109,81 +109,18 @@ export class TestEnvironment {
 
 }
 
-export class MockGitUtils {
-  static mockCommands: Map<string, { stdout?: string; stderr?: string; exitCode?: number }> = new Map();
-
-  static mockCommand(command: string, response: { stdout?: string; stderr?: string; exitCode?: number }): void {
-    this.mockCommands.set(command, response);
-  }
-
-  static clearMocks(): void {
-    this.mockCommands.clear();
-  }
-
-  static async executeCommand(command: string, cwd?: string): Promise<string> {
-    const mock = this.mockCommands.get(command);
-    if (mock) {
-      if (mock.exitCode && mock.exitCode !== 0) {
-        throw new Error(mock.stderr || 'Command failed');
-      }
-      return mock.stdout || '';
-    }
-
-    // Default mocks for common commands
-    if (command.includes('git remote get-url origin')) {
-      return 'https://github.com/test/repo.git';
-    }
-    if (command.includes('git branch --show-current')) {
-      return 'main';
-    }
-    if (command.includes('git status --porcelain')) {
-      return '';
-    }
-    if (command.includes('git symbolic-ref refs/remotes/origin/HEAD')) {
-      return 'refs/remotes/origin/main';
-    }
-
-    return '';
-  }
-}
-
 export function mockEnvironmentVariables(overrides: Record<string, string> = {}): () => void {
   const originalEnv = { ...process.env };
-  
-  // Clear existing HOME and set new one
-  Object.keys(process.env).forEach(key => {
+
+  Object.keys(process.env).forEach((key) => {
     if (key in overrides) {
       delete process.env[key];
     }
   });
-  
+
   Object.assign(process.env, overrides);
-  
+
   return () => {
     process.env = originalEnv;
-  };
-}
-
-export function captureConsoleOutput(): { 
-  logs: string[]; 
-  errors: string[]; 
-  restore: () => void;
-} {
-  const logs: string[] = [];
-  const errors: string[] = [];
-  
-  const originalLog = console.log;
-  const originalError = console.error;
-  
-  console.log = (...args) => logs.push(args.join(' '));
-  console.error = (...args) => errors.push(args.join(' '));
-  
-  return {
-    logs,
-    errors,
-    restore: () => {
-      console.log = originalLog;
-      console.error = originalError;
-    },
   };
 }
