@@ -1,137 +1,122 @@
 # WKT Testing Guide
 
-This document outlines the testing strategy and available tests for the WKT CLI tool.
+This document outlines the testing strategy for the WKT CLI tool.
 
 ## Test Structure
 
 ```
 test/
-├── unit/                    # Unit tests for individual modules
-│   ├── branch-inference.test.ts    # ✅ Branch inference logic
-│   ├── config.test.ts              # ⚠️  Config management (needs isolation fixes)
-│   └── database.test.ts            # ⚠️  Database operations (needs isolation fixes)
-├── integration/             # Integration tests for commands
-│   ├── init-command.test.ts        # ⚠️  Init command (needs mocking fixes)
-│   └── create-command.test.ts      # ⚠️  Create command (needs mocking fixes)
-├── e2e/                     # End-to-end tests
-│   └── basic-workflow.test.ts      # ✅ CLI behavior and command structure
-├── fixtures/                # Test data and fixtures
-│   └── clean-database.json         # Clean database state for tests
-└── utils/                   # Test utilities and helpers
-    ├── test-helpers.ts             # Test environment and mocking utilities
-    └── test-managers.ts            # Test-specific manager classes
+├── unit/                           # Unit tests for pure logic
+│   ├── branch-inference.test.ts    # Branch inference and sanitization
+│   ├── config.test.ts              # Config management
+│   ├── database.test.ts            # Database operations
+│   └── duration.test.ts            # Duration parsing
+├── e2e/                            # End-to-end tests with real git
+│   └── basic-workflow.test.ts      # Full CLI workflows
+└── utils/                          # Test utilities
+    └── test-helpers.ts             # Test environment helpers
 ```
 
 ## Running Tests
 
-### All Working Tests
 ```bash
-bun test test/unit/branch-inference.test.ts test/e2e/basic-workflow.test.ts
+# All tests
+bun test
+
+# Unit tests only
+bun test:unit
+
+# E2E tests only
+bun test:e2e
+
+# Watch mode
+bun test:watch
+
+# With coverage
+bun test:coverage
 ```
 
-### Individual Test Suites
-```bash
-# Unit tests (branch inference only - fully working)
-bun test test/unit/branch-inference.test.ts
+## Test Layers
 
-# End-to-end tests (CLI behavior - fully working)
-bun test test/e2e/basic-workflow.test.ts
+### Unit Tests (53 tests)
 
-# All unit tests (some need fixes)
-bun test test/unit
+Test pure logic without external dependencies:
 
-# Integration tests (need mocking fixes)
-bun test test/integration
-```
+- **Branch Inference** — Pattern matching, branch name inference, workspace name sanitization
+- **Config** — Loading, merging, saving YAML config, project-specific overrides
+- **Database** — CRUD operations for projects/workspaces, search, current workspace tracking
+- **Duration** — Parsing duration strings (`30d`, `2w`, `6m`, `1y`)
 
-### Test Scripts
-```bash
-bun run test:unit          # Run unit tests
-bun run test:integration   # Run integration tests  
-bun run test:e2e          # Run end-to-end tests
-bun run test:watch        # Run tests in watch mode
-```
+### E2E Tests (23 tests)
 
-## Test Status
+Test the actual CLI binary with real git operations:
 
-### ✅ **Working Tests (31 tests passing)**
+- **Basic Commands** — Help, version, error handling for missing resources
+- **Command Help** — All commands have proper help text and options
+- **Full Workflow** — Real git repo creation, init → create → list → switch → clean
 
-#### Branch Inference Tests
-- ✅ Infer branch name from ticket number (`1234` → `feature/eng-1234`)
-- ✅ Infer branch name from eng-prefixed ticket (`eng-5678` → `feature/5678`)
-- ✅ Pass through feature/hotfix/bugfix branches unchanged
-- ✅ Handle custom patterns and templates
-- ✅ Sanitize workspace names with different strategies
-- ✅ Generate workspace IDs correctly
+E2E tests create temporary git repositories in `/tmp` and run the built CLI against them.
 
-#### CLI E2E Tests
-- ✅ Show help when no arguments provided
-- ✅ Handle version flag correctly
-- ✅ Show appropriate messages for empty state
-- ✅ Handle errors for non-existent projects/workspaces
-- ✅ Validate command structure and help text
-- ✅ All commands have proper help documentation
+## Test Coverage
 
-### ⚠️ **Tests Needing Fixes**
+### Well Covered
+- Branch name inference and sanitization
+- Config loading, merging, and persistence
+- Database CRUD operations
+- CLI command structure
+- Full init → create → switch → list → clean workflow
+- Error handling for edge cases
 
-#### Database & Config Tests
-**Issue**: Tests interfere with each other and real WKT data
-**Solution Needed**: Better test isolation with temporary directories
-
-#### Integration Tests  
-**Issue**: Git operations mocking needs improvement
-**Solution Needed**: More robust mocking of git commands
-
-## Test Coverage Areas
-
-### ✅ **Well Covered**
-- Branch name inference patterns
-- Workspace name sanitization
-- CLI command structure and help
-- Error handling for non-existent resources
-- Basic CLI behavior
-
-### 🔄 **Partially Covered**
-- Configuration management (logic works, tests need isolation)
-- Database operations (logic works, tests need isolation)
-- Command integration (basic structure tested)
-
-### ❌ **Not Yet Covered**
-- Git operations (GitUtils class)
-- Real git worktree creation/management
-- **Local files management** - Symlink creation, template processing, workspace-specific templates
-- **Workspace-specific template configuration** - Pattern matching, variable substitution
-- File system operations
-- Cross-platform compatibility
+### Not Yet Covered
+- Local files management (symlinks, templates)
+- Cross-platform compatibility (Windows)
 - Performance under load
+- Lifecycle hooks execution
 
-## Manual Testing
+## Adding Tests
 
-The CLI has been thoroughly manually tested with:
-- ✅ Real repository initialization (`slingshot/eslint-config-slingshot`)
-- ✅ Workspace creation with various branch patterns
-- ✅ Workspace switching and listing
-- ✅ Error scenarios and edge cases
-- ✅ Configuration and database persistence
-- ✅ **Local files management** - Symlink and template file setup during workspace creation
+### Unit Tests
 
-## Future Testing Improvements
+For pure functions and class methods that don't require git:
 
-1. **Fix Test Isolation**: Update config/database tests to use isolated environments
-2. **Improve Git Mocking**: Create more realistic git operation mocks
-3. **Add Local Files Tests**: Test symlink creation, template processing, workspace-specific configs
-4. **Add Template Engine Tests**: Test pattern matching, variable substitution, conditional templates
-5. **Add Performance Tests**: Test with many projects/workspaces
-6. **Cross-Platform Tests**: Test on Windows, macOS, Linux
-7. **Real Git Integration Tests**: Test with actual git repositories
-8. **Add Coverage Reporting**: Track test coverage metrics
+```typescript
+import { describe, it, expect } from 'bun:test';
 
-## Continuous Integration
+describe('MyFunction', () => {
+  it('should do something', () => {
+    expect(myFunction('input')).toBe('expected');
+  });
+});
+```
 
-Tests run automatically on:
-- ✅ All pushes to `main` and `develop` branches
-- ✅ All pull requests to `main`
-- ✅ Lint, typecheck, build, and working tests
-- ✅ Basic CLI functionality verification
+### E2E Tests
 
-GitHub Actions workflow: `.github/workflows/test.yml`
+For testing CLI commands with real git operations:
+
+```typescript
+import { execSync } from 'child_process';
+
+function createTestGitRepo(path: string): void {
+  mkdirSync(path, { recursive: true });
+  execSync('git init', { cwd: path, stdio: 'pipe' });
+  execSync('git config user.email "test@test.com"', { cwd: path, stdio: 'pipe' });
+  execSync('git config user.name "Test User"', { cwd: path, stdio: 'pipe' });
+  writeFileSync(join(path, 'README.md'), '# Test\n');
+  execSync('git add . && git commit -m "Initial"', { cwd: path, stdio: 'pipe' });
+}
+
+it('should init project', async () => {
+  const result = await wkt(['init', repoPath, 'my-project'], testDir);
+  expect(result.exitCode).toBe(0);
+});
+```
+
+## CI Integration
+
+Tests run on all pushes and PRs via GitHub Actions (`.github/workflows/test.yml`):
+
+1. Lint check
+2. Type check
+3. Build
+4. Unit tests
+5. E2E tests
