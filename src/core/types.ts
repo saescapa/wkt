@@ -165,10 +165,6 @@ export interface SyncCommandOptions extends BaseCommandOptions {
   all?: boolean;
 }
 
-export interface ExecCommandOptions extends BaseCommandOptions {
-  timeout?: number;
-}
-
 export interface RunCommandOptions extends BaseCommandOptions {
   timeout?: number;
 }

@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import inquirer from 'inquirer';
 import { DatabaseManager } from '../core/database.js';
 import { ErrorHandler } from '../utils/errors.js';
 
@@ -7,6 +8,7 @@ interface InfoCommandOptions {
   branchOnly?: boolean;
   nameOnly?: boolean;
   json?: boolean;
+  setDescription?: string | boolean;
 }
 
 export async function infoCommand(options: InfoCommandOptions = {}): Promise<void> {
@@ -23,6 +25,37 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
       }
       console.log(chalk.yellow('Not in a workspace directory.'));
       console.log(chalk.gray('Run this command from within a workspace, or use `wkt list` to see all workspaces.'));
+      return;
+    }
+
+    // Handle setting description
+    if (options.setDescription !== undefined) {
+      let newDescription: string;
+
+      if (typeof options.setDescription === 'string') {
+        newDescription = options.setDescription;
+      } else {
+        // Interactive prompt
+        const { description } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'description',
+            message: `Enter description for workspace '${workspace.name}':`,
+            default: workspace.description || '',
+          },
+        ]);
+        newDescription = description;
+      }
+
+      workspace.description = newDescription || undefined;
+      dbManager.updateWorkspace(workspace);
+
+      if (newDescription) {
+        console.log(chalk.green(`✓ Updated description for workspace '${workspace.name}'`));
+        console.log(chalk.dim(`  ${newDescription}`));
+      } else {
+        console.log(chalk.green(`✓ Removed description from workspace '${workspace.name}'`));
+      }
       return;
     }
 

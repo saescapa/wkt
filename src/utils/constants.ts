@@ -4,7 +4,7 @@
 
 // Application metadata
 export const APP_NAME = 'wkt';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '0.1.0';
 export const APP_DESCRIPTION = 'A flexible CLI tool for managing multiple project working directories using git worktrees';
 
 // File and directory names
