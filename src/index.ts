@@ -21,6 +21,9 @@ program
   .description('A flexible CLI tool for managing multiple project working directories using git worktrees')
   .version('1.0.0');
 
+// Setup Commands
+program.commandsGroup('Setup:');
+
 program
   .command('init')
   .description('Initialize WKT with a repository')
@@ -30,6 +33,17 @@ program
   .option('-t, --template <name>', 'Apply a project template during initialization')
   .option('--apply-template', 'Apply template to an existing project (first argument becomes project name)')
   .action(initCommand);
+
+program
+  .command('config')
+  .description('Manage WKT configuration')
+  .argument('[subcommand]', 'Subcommand: show, edit, open, path, debug (default: show)')
+  .option('--project <name>', 'Work with project-specific config')
+  .option('--global', 'Work with global config (default)')
+  .action(configCommand);
+
+// Workspace Management Commands
+program.commandsGroup('Workspace Management:');
 
 program
   .command('create')
@@ -77,22 +91,48 @@ program
   .action(cleanCommand);
 
 program
-  .command('config')
-  .description('Manage WKT configuration')
-  .argument('[subcommand]', 'Subcommand: show, edit, open, path, debug (default: show)')
-  .option('--project <name>', 'Work with project-specific config')
-  .option('--global', 'Work with global config (default)')
-  .action(configCommand);
+  .command('rename')
+  .description('Rename current workspace (optionally with new branch)')
+  .argument('<new-name>', 'New workspace/branch name')
+  .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: main)')
+  .option('--no-rebase', 'Simple rename: rename branch in-place without creating new branch or rebasing')
+  .option('--name <name>', 'Custom workspace directory name (default: inferred from branch name)')
+  .option('--description <text>', 'Update workspace description')
+  .option('--force', 'Force rename even if working tree is dirty')
+  .action(renameCommand);
 
 program
-  .command('sync')
-  .description('Sync local files to existing workspaces')
-  .option('--project <name>', 'Sync specific project only')
-  .option('--workspace <name>', 'Sync specific workspace only')
-  .option('--all', 'Sync all workspaces without confirmation')
-  .option('--force', 'Skip confirmation prompts')
-  .option('--dry', 'Show what would be synced (dry run)')
-  .action(syncCommand);
+  .command('recycle')
+  .description('Recycle current workspace to a new branch while preserving all files (alias for rename)')
+  .argument('<new-branch-name>', 'New branch name')
+  .option('--from <branch>', 'Base branch to rebase from (default: main)')
+  .option('--no-rebase', 'Skip rebasing from base branch')
+  .option('--name <name>', 'Custom workspace name (default: inferred from branch)')
+  .option('--description <text>', 'Update workspace description')
+  .option('--force', 'Force recycle even if working tree is dirty')
+  .action(recycleCommand);
+
+// Workspace Info Commands
+program.commandsGroup('Workspace Info:');
+
+program
+  .command('info')
+  .description('Show detailed information about current workspace')
+  .option('--description-only', 'Output only the description (for shell integration)')
+  .option('--branch-only', 'Output only the branch name')
+  .option('--name-only', 'Output only the workspace name')
+  .option('--json', 'Output as JSON')
+  .action(infoCommand);
+
+program
+  .command('describe')
+  .description('View or update workspace description')
+  .argument('[workspace]', 'Workspace name (optional, uses current workspace if not specified)')
+  .argument('[description]', 'New description (optional, prompts if not provided)')
+  .action(describeCommand);
+
+// Execution Commands
+program.commandsGroup('Execution:');
 
 program
   .command('exec')
@@ -119,42 +159,14 @@ program
   });
 
 program
-  .command('rename')
-  .description('Rename current workspace (optionally with new branch)')
-  .argument('<new-name>', 'New workspace/branch name')
-  .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: main)')
-  .option('--no-rebase', 'Simple rename: rename branch in-place without creating new branch or rebasing')
-  .option('--name <name>', 'Custom workspace directory name (default: inferred from branch name)')
-  .option('--description <text>', 'Update workspace description')
-  .option('--force', 'Force rename even if working tree is dirty')
-  .action(renameCommand);
-
-program
-  .command('recycle')
-  .description('Recycle current workspace to a new branch while preserving all files (alias for rename)')
-  .argument('<new-branch-name>', 'New branch name')
-  .option('--from <branch>', 'Base branch to rebase from (default: main)')
-  .option('--no-rebase', 'Skip rebasing from base branch')
-  .option('--name <name>', 'Custom workspace name (default: inferred from branch)')
-  .option('--description <text>', 'Update workspace description')
-  .option('--force', 'Force recycle even if working tree is dirty')
-  .action(recycleCommand);
-
-program
-  .command('describe')
-  .description('View or update workspace description')
-  .argument('[workspace]', 'Workspace name (optional, uses current workspace if not specified)')
-  .argument('[description]', 'New description (optional, prompts if not provided)')
-  .action(describeCommand);
-
-program
-  .command('info')
-  .description('Show detailed information about current workspace')
-  .option('--description-only', 'Output only the description (for shell integration)')
-  .option('--branch-only', 'Output only the branch name')
-  .option('--name-only', 'Output only the workspace name')
-  .option('--json', 'Output as JSON')
-  .action(infoCommand);
+  .command('sync')
+  .description('Sync local files to existing workspaces')
+  .option('--project <name>', 'Sync specific project only')
+  .option('--workspace <name>', 'Sync specific workspace only')
+  .option('--all', 'Sync all workspaces without confirmation')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--dry', 'Show what would be synced (dry run)')
+  .action(syncCommand);
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));
