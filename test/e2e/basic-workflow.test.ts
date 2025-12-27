@@ -58,6 +58,7 @@ function createTestGitRepo(path: string): void {
 
   execSync('git add .', { cwd: path, stdio: 'pipe' });
   execSync('git commit -m "Initial commit"', { cwd: path, stdio: 'pipe' });
+  execSync('git branch -M main', { cwd: path, stdio: 'pipe' });
 }
 
 describe('WKT CLI', () => {
