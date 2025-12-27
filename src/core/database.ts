@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import type { WKTDatabase, Project, Workspace } from './types.js';
 import { ConfigManager } from './config.js';
+import { CURRENT_SCHEMA_VERSION, needsMigration, migrateDatabase } from './migrations.js';
+import { logger } from '../utils/logger.js';
 
 export class DatabaseManager {
   private configManager: ConfigManager;
@@ -19,6 +21,7 @@ export class DatabaseManager {
       workspaces: {},
       metadata: {
         version: '1.0.0',
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         lastCleanup: new Date(),
       },
     };
@@ -37,15 +40,27 @@ export class DatabaseManager {
 
     try {
       const dbFile = readFileSync(this.dbPath, 'utf-8');
-      this.db = JSON.parse(dbFile, (key, value) => {
+      let parsedDb = JSON.parse(dbFile, (key, value) => {
         if (key.includes('At') || key.includes('Used') || key === 'lastCleanup') {
           return new Date(value);
         }
         return value;
-      });
-      return this.db!;
+      }) as WKTDatabase;
+
+      // Run migrations if needed
+      if (needsMigration(parsedDb)) {
+        logger.info('Upgrading database schema...');
+        parsedDb = migrateDatabase(parsedDb);
+        this.db = parsedDb;
+        this.saveDatabase();
+        logger.info('Database schema upgraded successfully.');
+      } else {
+        this.db = parsedDb;
+      }
+
+      return this.db;
     } catch (error) {
-      console.warn('Error reading database file, creating new one:', error);
+      logger.warn(`Error reading database file, creating new one: ${error}`);
       this.db = this.getEmptyDatabase();
       this.saveDatabase();
       return this.db;

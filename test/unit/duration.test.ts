@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { parseDuration } from '../../src/utils/git.js';
+import { parseDuration } from '../../src/utils/git/index.js';
 
 describe('parseDuration', () => {
   it('should parse days correctly', () => {

@@ -32,15 +32,25 @@ src/
 ├── core/                 # Core abstractions
 │   ├── config.ts         # ConfigManager class
 │   ├── database.ts       # DatabaseManager class
+│   ├── migrations.ts     # Database schema migrations
 │   └── types.ts          # All TypeScript interfaces
 └── utils/                # Utilities
-    ├── git.ts            # GitUtils class
+    ├── git/              # Git operations (modular)
+    │   ├── index.ts      # Re-exports all git functions
+    │   ├── command.ts    # Base command execution
+    │   ├── repository.ts # Repository operations
+    │   ├── branches.ts   # Branch operations
+    │   ├── worktrees.ts  # Worktree operations
+    │   ├── status.ts     # Status and diff operations
+    │   └── network.ts    # Network operations with retry
     ├── branch-inference.ts   # BranchInference class
     ├── local-files.ts    # LocalFilesManager class
     ├── script-executor.ts    # SafeScriptExecutor class
     ├── validation.ts     # Input validation
     ├── format.ts         # Output formatting
     ├── errors.ts         # WKTError and error classes
+    ├── logger.ts         # Debug logging utility
+    ├── retry.ts          # Network retry with backoff
     └── constants.ts      # Shared constants
 ```
 
@@ -74,6 +84,25 @@ Key methods:
 - `getWorkspaceFromPath()` — Detect workspace from current directory
 - `getCurrentWorkspaceContext()` — Get active workspace (path-based or stored)
 
+### Database Migrations (`src/core/migrations.ts`)
+
+Schema versioning and migration system for database upgrades:
+
+```typescript
+export const CURRENT_SCHEMA_VERSION = 1;
+
+export const migrations: Migration[] = [
+  // Future migrations go here
+  // {
+  //   version: 2,
+  //   description: 'Add tags to workspaces',
+  //   migrate: (db) => { ... }
+  // }
+];
+```
+
+The `DatabaseManager` automatically runs migrations when loading the database. Add new migrations to the `migrations` array when schema changes are needed.
+
 ### Configuration (`src/core/config.ts`)
 
 The `ConfigManager` class handles YAML configuration with a merge hierarchy:
@@ -88,25 +117,41 @@ Key methods:
 - `getWorkspaceConfig(workspacePath)` — Load workspace-local config
 - `ensureConfigDir()` — Initialize WKT directories
 
-### Git Operations (`src/utils/git.ts`)
+### Git Operations (`src/utils/git/`)
 
-The `GitUtils` class wraps git commands with async execution:
+Git operations are organized into focused modules with direct function exports:
 
-**Repository operations:**
+**`command.ts`** — Base execution:
+- `executeCommand()` — Run git commands with error handling and debug logging
+
+**`repository.ts`** — Repository operations:
 - `cloneBareRepository()` — Clone as bare repo
-- `createWorktree()` / `removeWorktree()` / `moveWorktree()` — Worktree management
-- `fetchAll()` / `fetchInWorkspace()` — Fetch from remotes
+- `isGitRepository()` — Check if path is a git repo
+- `getBareRepoUrl()` — Extract remote URL
+- `getDefaultBranch()` — Detect main/master
 
-**Branch operations:**
+**`branches.ts`** — Branch operations:
 - `getCurrentBranch()` — Get checked-out branch
 - `branchExists()` — Check if branch exists (local or remote)
 - `isBranchMerged()` — Detect if branch was merged (supports squash merges)
-- `getDefaultBranch()` — Detect main/master
+- `getBranchAge()` — Get last commit date
+- `rebaseBranch()` — Rebase onto target branch
 
-**Status operations:**
+**`worktrees.ts`** — Worktree management:
+- `createWorktree()` / `removeWorktree()` / `moveWorktree()` — CRUD operations
+- `listWorktrees()` — List all worktrees for a repo
+
+**`status.ts`** — Status operations:
 - `getWorkspaceStatus()` — Get staged/unstaged/untracked counts
 - `isWorkingTreeClean()` — Check for uncommitted changes
 - `getCommitsDiff()` — Count commits ahead/behind base
+
+**`network.ts`** — Network operations with automatic retry:
+- `fetchAll()` / `fetchInWorkspace()` — Fetch from remotes
+- `pullWithRebase()` — Pull with rebase
+- `pushBranch()` — Push to remote
+
+All functions use debug logging and network operations automatically retry up to 3 times with exponential backoff.
 
 ### Local Files (`src/utils/local-files.ts`)
 
@@ -154,6 +199,39 @@ Custom error classes provide structured error handling:
 | `ConfigurationError` | Invalid configuration |
 
 The `ErrorHandler` class provides consistent error display with helpful hints.
+
+### Logger (`src/utils/logger.ts`)
+
+Debug logging utility with log levels:
+
+```typescript
+import { logger } from './utils/logger.js';
+
+logger.debug('Detailed info');  // Only shown with --debug flag
+logger.info('General info');
+logger.warn('Warning message');
+logger.error('Error message');
+```
+
+Enable debug mode via:
+- `--debug` CLI flag
+- `WKT_DEBUG=1` environment variable
+
+### Retry Utility (`src/utils/retry.ts`)
+
+Exponential backoff retry for network operations:
+
+```typescript
+import { withRetry } from './utils/retry.js';
+
+const result = await withRetry(
+  () => someNetworkOperation(),
+  'operation name',
+  { maxAttempts: 3, initialDelayMs: 1000 }
+);
+```
+
+Automatically retries on network errors like connection timeouts and DNS failures.
 
 ### Constants (`src/utils/constants.ts`)
 
@@ -275,12 +353,12 @@ Bun used for:
 
 But the output runs on Node.js for broader compatibility.
 
-### 6. Class-Based Utilities
+### 6. Mixed Patterns for Utilities
 
-Core utilities use classes (`DatabaseManager`, `ConfigManager`, `GitUtils`, etc.) to:
-- Encapsulate state where needed
-- Provide clear public APIs
-- Enable easier testing and mocking
+Core utilities use classes where state management is needed (`DatabaseManager`, `ConfigManager`, `Logger`) and direct function exports for stateless operations (git functions, retry utility):
+- Classes encapsulate state and provide clear APIs
+- Function modules offer simpler imports and better tree shaking
+- Both patterns support testing and mocking
 
 ## Adding a New Command
 

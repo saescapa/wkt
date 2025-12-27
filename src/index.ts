@@ -12,11 +12,36 @@ import { syncCommand } from './commands/sync.js';
 import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { infoCommand } from './commands/info.js';
+import { Logger, logger } from './utils/logger.js';
+import { ErrorHandler } from './utils/errors.js';
+
+// Global error handlers
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.debug('Unhandled promise rejection:', reason);
+  if (reason instanceof Error) {
+    ErrorHandler.handle(reason, 'unhandled rejection');
+  } else {
+    console.error(chalk.red('Unhandled rejection:'), reason);
+    process.exit(1);
+  }
+});
+
+process.on('uncaughtException', (error: Error) => {
+  logger.debug('Uncaught exception:', error);
+  ErrorHandler.handle(error, 'uncaught exception');
+});
 
 program
   .name('wkt')
   .description('A flexible CLI tool for managing multiple project working directories using git worktrees')
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('--debug', 'Enable debug logging')
+  .hook('preAction', (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.debug) {
+      Logger.initialize({ level: 'debug' });
+    }
+  });
 
 // Setup Commands
 program.commandsGroup('Setup:');
