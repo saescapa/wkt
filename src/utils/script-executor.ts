@@ -92,7 +92,7 @@ export class SafeScriptExecutor {
     options: CommandOptions = {}
   ): Promise<void> {
     const hooks = this.getApplicableHooks('post_create', context, scriptConfig);
-    
+
     if (hooks.length === 0) {
       return;
     }
@@ -105,6 +105,118 @@ export class SafeScriptExecutor {
         const script = this.findScript(hook.script, context.workspace, scriptConfig);
         if (!script?.optional) {
           console.error(chalk.red(`Required script "${hook.script}" failed. Workspace created but setup incomplete.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute pre-switch hooks (runs on the workspace being switched FROM)
+   */
+  static async executePreSwitchHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: CommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('pre_switch', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🔄 Running pre-switch scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute post-switch hooks (runs on the workspace being switched TO)
+   */
+  static async executePostSwitchHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: CommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('post_switch', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🔄 Running post-switch scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed. Workspace switched but setup incomplete.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute pre-clean hooks (runs before workspace is removed)
+   */
+  static async executePreCleanHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: CommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('pre_clean', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🧹 Running pre-clean scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute post-clean hooks (runs after workspace is removed)
+   */
+  static async executePostCleanHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: CommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('post_clean', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🧹 Running post-clean scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed.`));
           break;
         }
       }
@@ -184,7 +296,7 @@ export class SafeScriptExecutor {
    * Get applicable hooks for a workspace
    */
   private static getApplicableHooks(
-    hookType: 'post_create' | 'pre_switch' | 'post_switch',
+    hookType: 'post_create' | 'pre_switch' | 'post_switch' | 'pre_clean' | 'post_clean',
     context: ExecutionContext,
     scriptConfig: ScriptConfig
   ): ScriptHook[] {
@@ -198,13 +310,12 @@ export class SafeScriptExecutor {
     // Workspace-specific hooks
     const workspaceScriptConfig = scriptConfig.workspace_scripts || {};
     for (const [pattern, config] of Object.entries(workspaceScriptConfig)) {
-      if (this.matchesPattern(context.workspace.name, pattern) || 
+      if (this.matchesPattern(context.workspace.name, pattern) ||
           this.matchesPattern(context.workspace.branchName, pattern)) {
-        if (hookType === 'post_create' && config.post_create) {
-          hooks.push(...config.post_create);
+        const workspaceHooks = config[hookType];
+        if (workspaceHooks) {
+          hooks.push(...workspaceHooks);
         }
-        // Note: pre_switch and post_switch hooks not currently supported in workspace_scripts
-        // but we'll add proper type checking if/when they are
       }
     }
 
