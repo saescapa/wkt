@@ -1,9 +1,7 @@
 import chalk from 'chalk';
-import { existsSync } from 'fs';
 import type { ListCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
-import { GitUtils } from '../utils/git.js';
 
 export async function listCommand(options: ListCommandOptions = {}): Promise<void> {
   const dbManager = new DatabaseManager();
@@ -27,9 +25,6 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
-  // Update workspace status in real-time
-  await updateWorkspaceStatuses(workspaces, dbManager);
-
   if (options.filter) {
     const filterPattern = options.filter.toLowerCase();
     workspaces = workspaces.filter(w =>
@@ -44,9 +39,13 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
-  // Apply smart filtering for inactive main branches (unless --all flag is used)
+  const currentWorkspace = dbManager.getCurrentWorkspace();
+
+  // Separate active vs inactive workspaces
+  let activeWorkspaces = workspaces;
+  let inactiveWorkspaces: Workspace[] = [];
+
   if (!options.all && config.display.hide_inactive_main_branches) {
-    const currentWorkspace = dbManager.getCurrentWorkspace();
     const allProjects = dbManager.getAllProjects();
     const projectDefaultBranches = new Map(
       allProjects.map(p => [p.name, p.defaultBranch])
@@ -56,47 +55,52 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     const inactiveDaysThreshold = config.display.main_branch_inactive_days;
     const inactiveThresholdMs = inactiveDaysThreshold * 24 * 60 * 60 * 1000;
 
-    workspaces = workspaces.filter(workspace => {
+    activeWorkspaces = [];
+    inactiveWorkspaces = [];
+
+    for (const workspace of workspaces) {
       const defaultBranch = projectDefaultBranches.get(workspace.projectName);
       const isMainBranch = defaultBranch && workspace.branchName === defaultBranch;
 
+      // Non-main branches are always active
       if (!isMainBranch) {
-        return true; // Always show non-main branches
+        activeWorkspaces.push(workspace);
+        continue;
       }
 
-      // Show main branch if it's the current workspace
+      // Current workspace is always active
       if (currentWorkspace?.id === workspace.id) {
-        return true;
+        activeWorkspaces.push(workspace);
+        continue;
       }
 
-      // Show main branch if it has uncommitted changes
+      // Main branch with uncommitted changes is active
       if (!workspace.status.clean) {
-        return true;
+        activeWorkspaces.push(workspace);
+        continue;
       }
 
-      // Show main branch if it was used recently
+      // Check if recently used
       const timeSinceLastUse = now.getTime() - workspace.lastUsed.getTime();
       if (timeSinceLastUse < inactiveThresholdMs) {
-        return true;
+        activeWorkspaces.push(workspace);
+      } else {
+        inactiveWorkspaces.push(workspace);
       }
-
-      // Hide inactive main branch
-      return false;
-    });
-
-    if (workspaces.length === 0) {
-      console.log(chalk.yellow('No active workspaces found.'));
-      console.log(chalk.gray('Use --all to show inactive main branches.'));
-      return;
     }
   }
 
-  const currentWorkspace = dbManager.getCurrentWorkspace();
-
   if (options.groupBy === 'project' || !options.groupBy) {
-    displayGroupedByProject(workspaces, currentWorkspace, options.details);
+    displayGroupedByProject(activeWorkspaces, currentWorkspace, options.details);
   } else {
-    displayFlat(workspaces, currentWorkspace, options.details);
+    displayFlat(activeWorkspaces, currentWorkspace, options.details);
+  }
+
+  // Show inactive workspaces in separate section
+  if (inactiveWorkspaces.length > 0) {
+    console.log(chalk.dim('─'.repeat(40)));
+    console.log(chalk.dim.bold('Inactive:'));
+    displayInactiveWorkspaces(inactiveWorkspaces, options.details);
   }
 }
 
@@ -123,9 +127,26 @@ function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, show
     .forEach(workspace => {
       const isCurrent = currentWorkspace?.id === workspace.id;
       const prefix = isCurrent ? chalk.green('* ') : '  ';
-      
+
       console.log(formatWorkspace(workspace, prefix, showDetails, true));
     });
+}
+
+function displayInactiveWorkspaces(workspaces: Workspace[], showDetails?: boolean): void {
+  const projectGroups = groupWorkspacesByProject(workspaces);
+
+  Object.entries(projectGroups).forEach(([projectName, projectWorkspaces]) => {
+    console.log(chalk.dim(`  ${projectName}:`));
+
+    projectWorkspaces.forEach(workspace => {
+      const timeAgo = formatTimeAgo(workspace.lastUsed);
+      if (showDetails) {
+        console.log(chalk.dim(`      ${workspace.name} (${workspace.branchName}) - ${timeAgo}`));
+      } else {
+        console.log(chalk.dim(`      ${workspace.name} - ${timeAgo}`));
+      }
+    });
+  });
 }
 
 function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boolean, includeProject?: boolean): string {
@@ -253,32 +274,3 @@ function formatTimeAgo(date: Date): string {
   }
 }
 
-async function updateWorkspaceStatuses(workspaces: Workspace[], dbManager: DatabaseManager): Promise<void> {
-  // Update status for each workspace in parallel
-  const updates = workspaces.map(async (workspace) => {
-    // Skip if workspace path doesn't exist
-    if (!existsSync(workspace.path)) {
-      return;
-    }
-
-    try {
-      // Get current git status
-      const status = await GitUtils.getWorkspaceStatus(workspace.path);
-
-      // Update workspace status if it changed
-      if (status.clean !== workspace.status.clean ||
-          status.staged !== workspace.status.staged ||
-          status.unstaged !== workspace.status.unstaged ||
-          status.untracked !== workspace.status.untracked ||
-          status.conflicted !== workspace.status.conflicted) {
-        workspace.status = status;
-        dbManager.updateWorkspace(workspace);
-      }
-    } catch (error) {
-      // Silently skip workspaces with git errors (might be corrupted or deleted)
-      console.warn(`Warning: Could not update status for workspace ${workspace.name}`);
-    }
-  });
-
-  await Promise.all(updates);
-}
