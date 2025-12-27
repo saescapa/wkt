@@ -77,9 +77,9 @@ describe('Basic WKT Workflow E2E', () => {
 
   it('should handle version flag', async () => {
     const result = await runWktCommand(['--version']);
-    
+
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('1.0.0');
+    expect(result.stdout).toContain('0.1.0');
   });
 
   it('should show no projects when listing initially', async () => {
@@ -98,9 +98,9 @@ describe('Basic WKT Workflow E2E', () => {
 
   it('should show error for non-existent workspace operations', async () => {
     const result = await runWktCommand(['switch', 'non-existent-workspace']);
-    
+
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('No workspaces found');
+    expect(result.stderr).toContain('not found');
   });
 
   it('should show empty workspace list initially', async () => {

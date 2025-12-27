@@ -1,6 +1,6 @@
 {
   "name": "wkt",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "A flexible CLI tool for managing multiple project working directories using git worktrees",
   "main": "dist/index.js",

@@ -9,17 +9,14 @@ import { listCommand } from './commands/list.js';
 import { cleanCommand } from './commands/clean.js';
 import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
-import { execCommand } from './commands/exec.js';
 import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
-import { recycleCommand } from './commands/recycle.js';
-import { describeCommand } from './commands/describe.js';
 import { infoCommand } from './commands/info.js';
 
 program
   .name('wkt')
   .description('A flexible CLI tool for managing multiple project working directories using git worktrees')
-  .version('1.0.0');
+  .version('0.1.0');
 
 // Setup Commands
 program.commandsGroup('Setup:');
@@ -101,17 +98,6 @@ program
   .option('--force', 'Force rename even if working tree is dirty')
   .action(renameCommand);
 
-program
-  .command('recycle')
-  .description('Recycle current workspace to a new branch while preserving all files (alias for rename)')
-  .argument('<new-branch-name>', 'New branch name')
-  .option('--from <branch>', 'Base branch to rebase from (default: main)')
-  .option('--no-rebase', 'Skip rebasing from base branch')
-  .option('--name <name>', 'Custom workspace name (default: inferred from branch)')
-  .option('--description <text>', 'Update workspace description')
-  .option('--force', 'Force recycle even if working tree is dirty')
-  .action(recycleCommand);
-
 // Workspace Info Commands
 program.commandsGroup('Workspace Info:');
 
@@ -122,29 +108,11 @@ program
   .option('--branch-only', 'Output only the branch name')
   .option('--name-only', 'Output only the workspace name')
   .option('--json', 'Output as JSON')
+  .option('-d, --set-description [text]', 'Set or update workspace description (prompts if no text provided)')
   .action(infoCommand);
-
-program
-  .command('describe')
-  .description('View or update workspace description')
-  .argument('[workspace]', 'Workspace name (optional, uses current workspace if not specified)')
-  .argument('[description]', 'New description (optional, prompts if not provided)')
-  .action(describeCommand);
 
 // Execution Commands
 program.commandsGroup('Execution:');
-
-program
-  .command('exec')
-  .description('Execute a command in a specific workspace')
-  .argument('<workspace>', 'Workspace identifier (project/workspace or workspace). Use "." for current workspace')
-  .argument('<command...>', 'Command to execute')
-  .option('--force', 'Skip confirmation prompts')
-  .option('--dry', 'Show what would be executed (dry run)')
-  .option('--timeout <ms>', 'Command timeout in milliseconds', '120000')
-  .action((workspace, command, options) => {
-    execCommand(workspace, command, options);
-  });
 
 program
   .command('run')
