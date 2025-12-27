@@ -30,132 +30,138 @@ src/
 │   ├── sync.ts           # wkt sync
 │   └── config.ts         # wkt config
 ├── core/                 # Core abstractions
-│   ├── config.ts         # Configuration loading/merging
-│   ├── database.ts       # Workspace metadata storage
-│   └── types.ts          # TypeScript types
+│   ├── config.ts         # ConfigManager class
+│   ├── database.ts       # DatabaseManager class
+│   └── types.ts          # All TypeScript interfaces
 └── utils/                # Utilities
-    ├── git.ts            # Git operations
-    ├── branch-inference.ts   # Branch name patterns
-    ├── local-files.ts    # Symlinks and templates
-    ├── script-executor.ts    # Script execution
+    ├── git.ts            # GitUtils class
+    ├── branch-inference.ts   # BranchInference class
+    ├── local-files.ts    # LocalFilesManager class
+    ├── script-executor.ts    # SafeScriptExecutor class
     ├── validation.ts     # Input validation
     ├── format.ts         # Output formatting
-    ├── errors.ts         # Error handling
+    ├── errors.ts         # WKTError and error classes
     └── constants.ts      # Shared constants
 ```
 
 ## Core Concepts
 
+### Types (`src/core/types.ts`)
+
+All TypeScript interfaces are defined in `src/core/types.ts`. Key types include:
+
+| Interface | Purpose |
+|-----------|---------|
+| `WKTDatabase` | Root database structure with projects, workspaces, and metadata |
+| `Project` | Repository metadata (name, paths, default branch) |
+| `Workspace` | Worktree metadata (branch, path, status, timestamps) |
+| `WorkspaceStatus` | Git status counts (staged, unstaged, untracked, conflicted) |
+| `GlobalConfig` | Full configuration structure |
+| `ProjectConfig` | Project-specific configuration overrides |
+| `ScriptDefinition` | Safe script execution configuration |
+| `ScriptHook` | Lifecycle hook configuration |
+
+> **Note:** Always refer to `src/core/types.ts` for the authoritative type definitions.
+
 ### Database (`src/core/database.ts`)
 
-JSON file storing project and workspace metadata:
+The `DatabaseManager` class handles persistence of project and workspace metadata to `~/.wkt/database.json`.
 
-```typescript
-interface Database {
-  projects: Record<string, Project>;
-  workspaces: Record<string, Workspace>;
-  currentWorkspace: string | null;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  repoPath: string;           // Bare repo path
-  workspacesPath: string;     // Workspaces directory
-  createdAt: string;
-}
-
-interface Workspace {
-  id: string;
-  projectID: string;
-  name: string;
-  branch: string;
-  path: string;
-  description?: string;
-  createdAt: string;
-  lastAccessedAt: string;
-}
-```
-
-The database is stored at `~/.wkt/database.json`.
+Key methods:
+- `getDatabase()` / `saveDatabase()` — Load and persist
+- `addProject()` / `getProject()` / `getAllProjects()` — Project CRUD
+- `addWorkspace()` / `getWorkspace()` / `getAllWorkspaces()` — Workspace CRUD
+- `getWorkspaceFromPath()` — Detect workspace from current directory
+- `getCurrentWorkspaceContext()` — Get active workspace (path-based or stored)
 
 ### Configuration (`src/core/config.ts`)
 
-YAML configuration with hierarchy:
+The `ConfigManager` class handles YAML configuration with a merge hierarchy:
 
-1. Workspace `.wkt.yaml`
+1. Workspace `.wkt.yaml` (highest priority)
 2. Project section in global config
-3. Global `~/.wkt/config.yaml`
+3. Global `~/.wkt/config.yaml` (lowest priority)
 
-Key functions:
-
-```typescript
-loadConfig(): Config
-loadProjectConfig(projectName: string): ProjectConfig
-mergeConfigs(base: Config, override: Partial<Config>): Config
-```
+Key methods:
+- `getConfig()` — Load merged global configuration
+- `getProjectConfig(projectName)` — Get project-specific overrides
+- `getWorkspaceConfig(workspacePath)` — Load workspace-local config
+- `ensureConfigDir()` — Initialize WKT directories
 
 ### Git Operations (`src/utils/git.ts`)
 
-Wrapper around git commands:
+The `GitUtils` class wraps git commands with async execution:
 
-```typescript
-// Core operations
-cloneBare(url: string, path: string): void
-addWorktree(repoPath: string, worktreePath: string, branch: string): void
-removeWorktree(repoPath: string, worktreePath: string): void
+**Repository operations:**
+- `cloneBareRepository()` — Clone as bare repo
+- `createWorktree()` / `removeWorktree()` / `moveWorktree()` — Worktree management
+- `fetchAll()` / `fetchInWorkspace()` — Fetch from remotes
 
-// Branch operations
-getCurrentBranch(path: string): string
-branchExists(repoPath: string, branch: string): boolean
-isBranchMerged(repoPath: string, branch: string, base: string): boolean
+**Branch operations:**
+- `getCurrentBranch()` — Get checked-out branch
+- `branchExists()` — Check if branch exists (local or remote)
+- `isBranchMerged()` — Detect if branch was merged (supports squash merges)
+- `getDefaultBranch()` — Detect main/master
 
-// Status
-hasUncommittedChanges(path: string): boolean
-getCommitInfo(path: string): CommitInfo
-```
+**Status operations:**
+- `getWorkspaceStatus()` — Get staged/unstaged/untracked counts
+- `isWorkingTreeClean()` — Check for uncommitted changes
+- `getCommitsDiff()` — Count commits ahead/behind base
 
 ### Local Files (`src/utils/local-files.ts`)
 
-Manages shared (symlinked) and copied files:
+The `LocalFilesManager` class manages shared and copied files across workspaces:
 
-```typescript
-syncLocalFiles(workspace: Workspace, config: Config): void
-createSymlink(source: string, target: string): void
-copyFromTemplate(template: string, target: string, variables: Record<string, string>): void
-```
+- **Shared files** — Symlinked from the main workspace (stay synchronized)
+- **Copied files** — Templated per workspace (become independent)
+
+Key method: `setupLocalFiles(project, workspacePath, projectConfig, globalConfig, workspace)`
 
 ### Script Executor (`src/utils/script-executor.ts`)
 
-Secure script execution:
+The `SafeScriptExecutor` class provides secure script execution with:
 
-```typescript
-interface ScriptDefinition {
-  name: string;
-  command: string[];
-  conditions?: ScriptConditions;
-  timeout?: number;
-  optional?: boolean;
-  env?: Record<string, string>;
-}
-
-executeScript(script: ScriptDefinition, context: ExecutionContext): Promise<void>
-validateCommand(command: string[], allowlist: string[]): boolean
-```
-
-Security features:
-- Command allowlisting
+- Command allowlisting (only whitelisted commands can run)
 - Timeout enforcement
 - Variable substitution (no shell injection)
+- Condition checking (file_exists, branch_pattern, etc.)
+
+Key methods:
+- `executeScript()` — Run a named script
+- `executePostCreationHooks()` / `executePreSwitchHooks()` / etc. — Lifecycle hooks
+- `createContext()` — Build execution context with template variables
 
 ### Branch Inference (`src/utils/branch-inference.ts`)
 
-Pattern matching for branch names:
+The `BranchInference` class handles pattern matching for branch names:
 
-```typescript
-inferBranchName(input: string, patterns: InferencePattern[]): string
-sanitizeWorkspaceName(branch: string, strategy: NamingStrategy): string
-```
+- `inferBranchName(input, patterns)` — Expand short input to full branch name
+- `sanitizeWorkspaceName(branch, strategy)` — Convert branch to directory name
+- `generateWorkspaceId(project, workspace)` — Create unique workspace identifier
+
+### Error Handling (`src/utils/errors.ts`)
+
+Custom error classes provide structured error handling:
+
+| Class | Purpose |
+|-------|---------|
+| `WKTError` | Base error with code and user-facing flag |
+| `ProjectNotFoundError` | Project doesn't exist |
+| `WorkspaceNotFoundError` | Workspace doesn't exist |
+| `WorkspaceExistsError` | Workspace already exists |
+| `CommandNotAllowedError` | Script command not in allowlist |
+| `ScriptNotFoundError` | Referenced script doesn't exist |
+| `ConfigurationError` | Invalid configuration |
+
+The `ErrorHandler` class provides consistent error display with helpful hints.
+
+### Constants (`src/utils/constants.ts`)
+
+Shared constants including:
+- Default timeouts and limits
+- Allowed commands list
+- Validation patterns
+- Error and success message templates
 
 ## Command Flow
 
@@ -194,30 +200,6 @@ sanitizeWorkspaceName(branch: string, strategy: NamingStrategy): string
    └── Success message with path
 ```
 
-## Error Handling
-
-Errors are thrown with context and caught at the command level:
-
-```typescript
-// src/utils/errors.ts
-class WKTError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public suggestions?: string[]
-  ) {
-    super(message);
-  }
-}
-
-// Usage
-throw new WKTError(
-  'Workspace already exists',
-  'WORKSPACE_EXISTS',
-  ['Use --force to overwrite', 'Choose a different name']
-);
-```
-
 ## Testing
 
 ```
@@ -227,8 +209,10 @@ test/
 │   ├── config.test.ts
 │   ├── database.test.ts
 │   └── duration.test.ts
-└── e2e/                  # CLI integration tests
-    └── basic-workflow.test.ts
+├── e2e/                  # CLI integration tests
+│   └── basic-workflow.test.ts
+└── utils/                # Test utilities
+    └── test-helpers.ts
 ```
 
 **Unit tests:** Test pure logic without git or filesystem.
@@ -240,6 +224,8 @@ bun test              # All tests
 bun test:unit         # Unit only
 bun test:e2e          # E2E only
 ```
+
+See `test/TESTING.md` for the full testing guide.
 
 ## Build
 
@@ -289,16 +275,26 @@ Bun used for:
 
 But the output runs on Node.js for broader compatibility.
 
+### 6. Class-Based Utilities
+
+Core utilities use classes (`DatabaseManager`, `ConfigManager`, `GitUtils`, etc.) to:
+- Encapsulate state where needed
+- Provide clear public APIs
+- Enable easier testing and mocking
+
 ## Adding a New Command
 
 1. Create `src/commands/mycommand.ts`:
 
 ```typescript
-import { Command } from 'commander';
-import { loadDatabase } from '../core/database.js';
+import type { MyCommandOptions } from '../core/types.js';
+import { DatabaseManager } from '../core/database.js';
+import { ConfigManager } from '../core/config.js';
 
-export function myCommand(arg: string, options: MyOptions): void {
-  const db = loadDatabase();
+export async function myCommand(arg: string, options: MyCommandOptions): Promise<void> {
+  const dbManager = new DatabaseManager();
+  const configManager = new ConfigManager();
+
   // Implementation
 }
 ```
@@ -316,7 +312,9 @@ program
   .action(myCommand);
 ```
 
-3. Add tests in `test/unit/` or `test/e2e/`.
+3. Add types to `src/core/types.ts` if needed.
+
+4. Add tests in `test/unit/` or `test/e2e/`.
 
 ## Contributing
 

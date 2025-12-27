@@ -57,10 +57,10 @@ wkts() {
 
 ## Documentation
 
-- [User Guide](docs/user-guide.md) - Complete usage documentation
-- [Configuration](docs/configuration.md) - Config file reference
-- [Architecture](docs/architecture.md) - Codebase overview
-- [Contributing](docs/contributing.md) - Development guide
+- [User Guide](docs/reference/user-guide.md) - Complete usage documentation
+- [Configuration](docs/reference/configuration.md) - Config file reference
+- [Architecture](docs/dev/architecture.md) - Codebase overview
+- [Contributing](docs/dev/contributing.md) - Development guide
 
 ## Development
 

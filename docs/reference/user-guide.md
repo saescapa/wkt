@@ -156,7 +156,7 @@ wkt switch auth --path-only
 
 ### `wkt list`
 
-List all workspaces.
+List all workspaces. Also available as `wkt ls`.
 
 ```bash
 wkt list [options]
@@ -438,12 +438,20 @@ In `.wkt.yaml` or `~/.wkt/config.yaml`:
 
 ```yaml
 scripts:
+  # Commands allowed to execute (security allowlist)
+  allowed_commands:
+    - "pnpm"
+    - "npm"
+
+  # Script definitions
   scripts:
     install-deps:
+      name: "Install Dependencies"
       command: ["pnpm", "install"]
       conditions:
         file_exists: ["package.json"]
 
+  # Lifecycle hooks
   hooks:
     post_create:
       - script: "install-deps"

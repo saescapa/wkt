@@ -74,6 +74,46 @@ Husky + lint-staged runs automatically on commit:
 - One export per file for commands
 - Group related utilities in same file
 
+## Documentation Style
+
+### Reference Code, Don't Duplicate It
+
+Documentation should point to source code rather than duplicating type definitions or function signatures. This prevents documentation from drifting out of sync with the implementation.
+
+**Do this:**
+```markdown
+### Types (`src/core/types.ts`)
+
+All TypeScript interfaces are defined in `src/core/types.ts`. Key types include:
+
+| Interface | Purpose |
+|-----------|---------|
+| `WKTDatabase` | Root database structure |
+| `Project` | Repository metadata |
+
+> Refer to the source file for complete definitions.
+```
+
+**Not this:**
+```markdown
+### Types
+
+```typescript
+interface Project {
+  id: string;
+  name: string;
+  // ... duplicated type definition that will become outdated
+}
+```
+
+### Documentation Principles
+
+1. **Source code is the source of truth** — Document behavior and usage, not implementation details
+2. **Use file paths** — Reference specific files so readers can find authoritative definitions
+3. **Document the "why"** — Explain design decisions, trade-offs, and intent
+4. **Document the "how to use"** — Provide examples of correct usage patterns
+5. **Update when behavior changes** — Not when internal implementation changes
+
 ### Imports
 
 ```typescript
@@ -92,17 +132,19 @@ import { formatWorkspace } from '../utils/format.js';
 
 ### Error Handling
 
+Use the custom error classes from `src/utils/errors.ts`:
+
 ```typescript
-// Throw descriptive errors with suggestions
-throw new WKTError(
-  'Project not found: my-project',
-  'PROJECT_NOT_FOUND',
-  [
-    'Run "wkt init --list" to see available projects',
-    'Run "wkt init <url>" to add a new project'
-  ]
-);
+import { ProjectNotFoundError, WorkspaceExistsError } from '../utils/errors.js';
+
+// Use specific error classes when available
+throw new ProjectNotFoundError('my-project');
+
+// Or use WKTError directly for custom errors
+throw new WKTError('Custom error message', 'CUSTOM_ERROR_CODE');
 ```
+
+The `ErrorHandler` class automatically provides helpful hints for common errors.
 
 ## Testing
 
