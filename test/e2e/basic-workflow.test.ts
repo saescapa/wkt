@@ -162,8 +162,8 @@ describe('WKT CLI', () => {
       const help = await getHelp('create');
 
       expect(help).toContain('Create a new workspace');
-      expect(help).toContain('<project>');
-      expect(help).toContain('<branch-name>');
+      expect(help).toContain('[project]');
+      expect(help).toContain('[branch-name]');
       expect(help).toContain('--from');
       expect(help).toContain('--name');
     });

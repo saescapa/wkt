@@ -4,6 +4,7 @@
     "": {
       "name": "wkt",
       "dependencies": {
+        "@inquirer/search": "^4.0.3",
         "chalk": "^5.6.2",
         "commander": "^14.0.2",
         "fuse.js": "^7.1.0",

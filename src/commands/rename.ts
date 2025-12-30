@@ -22,7 +22,7 @@ import {
 } from '../utils/errors.js';
 
 export async function renameCommand(
-  newName: string,
+  newName?: string,
   options: RenameCommandOptions = {}
 ): Promise<void> {
   try {
@@ -59,12 +59,40 @@ export async function renameCommand(
     const config = configManager.getConfig();
     const projectConfig = configManager.getProjectConfig(workspace.projectName);
 
+    // Interactive mode if newName not provided
+    let resolvedName = newName;
+    if (!resolvedName) {
+      console.log(chalk.blue(`\nRename workspace: ${workspace.name}`));
+      console.log(chalk.gray(`Current branch: ${workspace.branchName}\n`));
+
+      const { inputName } = await inquirer.prompt([{
+        type: 'input',
+        name: 'inputName',
+        message: 'New branch name or ticket ID:',
+        validate: (input: string) => {
+          if (!input.trim()) return 'Name is required';
+          return true;
+        }
+      }]);
+
+      if (!inputName.trim()) {
+        console.log(chalk.yellow('Rename cancelled'));
+        return;
+      }
+      resolvedName = inputName.trim();
+    }
+
+    // At this point resolvedName is guaranteed to be set
+    if (!resolvedName) {
+      return; // TypeScript flow analysis
+    }
+
     // Determine if this is a full recycle (--rename-branch) or simple rename
     const isRecycle = options.rebase !== false; // Default to true (recycle mode)
 
     // Infer new branch name using patterns
     const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
-    const inferredBranchName = BranchInference.inferBranchName(newName, inferencePatterns);
+    const inferredBranchName = BranchInference.inferBranchName(resolvedName, inferencePatterns);
 
     // Generate new workspace name
     const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;

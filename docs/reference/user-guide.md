@@ -61,9 +61,12 @@ Files that should be shared or templated across workspaces:
 
 ### `wkt init`
 
-Initialize WKT with a repository.
+Initialize WKT with a repository. Automatically creates a main workspace so you can start working immediately.
 
 ```bash
+# Interactive mode (prompts for repository URL)
+wkt init
+
 # From a remote repository
 wkt init git@github.com:user/repo.git [project-name]
 
@@ -77,6 +80,15 @@ wkt init --list
 wkt init project-name --apply-template --template my-template
 ```
 
+**What happens:**
+1. Clones the repository as a bare repo to `~/.wkt/projects/`
+2. Creates the main workspace in `~/.wkt/workspaces/<project>/main`
+3. Runs post-creation hooks (if configured)
+
+**Interactive Mode:**
+
+When run without arguments and not in a git repository, prompts for the repository URL interactively.
+
 **Options:**
 - `-l, --list` - List all managed projects
 - `-t, --template <name>` - Apply a project template
@@ -87,12 +99,15 @@ wkt init project-name --apply-template --template my-template
 Create a new workspace.
 
 ```bash
-wkt create <project> <branch-name> [options]
+wkt create [project] [branch-name] [options]
 ```
 
 **Examples:**
 
 ```bash
+# Interactive mode (prompts for project and branch)
+wkt create
+
 # Basic creation
 wkt create my-project feature/auth
 
@@ -239,12 +254,15 @@ wkt clean auth-system --force
 Rename current workspace.
 
 ```bash
-wkt rename <new-name> [options]
+wkt rename [new-name] [options]
 ```
 
 **Examples:**
 
 ```bash
+# Interactive mode (prompts for new name)
+wkt rename
+
 # Rename with new branch (rebased from main)
 wkt rename feature/new-name
 
@@ -307,7 +325,7 @@ wkt run [script-name] [workspace] [options]
 **Examples:**
 
 ```bash
-# Interactive script selection
+# Interactive script selection (autocomplete with fuzzy search)
 wkt run
 
 # Run specific script
@@ -323,7 +341,15 @@ wkt run setup --dry
 wkt run list
 ```
 
+**Interactive Mode:**
+
+When run without arguments, shows an autocomplete prompt:
+- Type to filter scripts with fuzzy matching
+- Scripts grouped by location (Scripts, Workspace, Shortcuts)
+- Arrow keys to navigate, Enter to select
+
 **Options:**
+- `-s, --search <query>` - Filter scripts by fuzzy search
 - `--force` - Skip confirmation
 - `--dry` - Show what would run
 - `--timeout <ms>` - Script timeout
