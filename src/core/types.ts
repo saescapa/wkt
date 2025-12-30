@@ -171,6 +171,7 @@ export interface SyncCommandOptions extends BaseCommandOptions {
 export interface RunCommandOptions extends BaseCommandOptions {
   timeout?: number;
   confirm?: boolean;
+  search?: string;
 }
 
 export interface InitCommandOptions {

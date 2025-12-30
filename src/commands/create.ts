@@ -1,7 +1,8 @@
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
-import type { CreateCommandOptions, Workspace } from '../core/types.js';
+import inquirer from 'inquirer';
+import type { CreateCommandOptions, Workspace, Project } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import {
@@ -22,14 +23,25 @@ import {
 } from '../utils/errors.js';
 
 export async function createCommand(
-  projectName: string,
-  branchName: string,
+  projectName?: string,
+  branchName?: string,
   options: CreateCommandOptions = {}
 ): Promise<void> {
   try {
     const configManager = new ConfigManager();
     const dbManager = new DatabaseManager();
     const localFilesManager = new LocalFilesManager();
+
+    // Interactive mode if project or branch not provided
+    if (!projectName || !branchName) {
+      const result = await selectProjectAndBranch(dbManager, projectName);
+      if (!result) {
+        console.log(chalk.yellow('Workspace creation cancelled'));
+        return;
+      }
+      projectName = result.projectName;
+      branchName = result.branchName;
+    }
 
     const project = dbManager.getProject(projectName);
     if (!project) {
@@ -134,28 +146,103 @@ export async function createCommand(
 
   } catch (error) {
     // Cleanup on error - need to re-initialize managers for cleanup
-    try {
-      const cleanupDbManager = new DatabaseManager();
-      const cleanupConfigManager = new ConfigManager();
-      // Variables might not be defined if error occurred early
-      const project = cleanupDbManager.getProject(projectName);
-      if (project) {
-        const config = cleanupConfigManager.getConfig();
-        const projectConfig = cleanupConfigManager.getProjectConfig(projectName);
-        const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
-        const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
-        const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
-        const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
-        const workspacePath = join(project.workspacesPath, workspaceName);
-        
-        if (existsSync(workspacePath)) {
-          await removeWorktree(project.bareRepoPath, workspacePath);
+    if (projectName && branchName) {
+      try {
+        const cleanupDbManager = new DatabaseManager();
+        const cleanupConfigManager = new ConfigManager();
+        const project = cleanupDbManager.getProject(projectName);
+        if (project) {
+          const config = cleanupConfigManager.getConfig();
+          const projectConfig = cleanupConfigManager.getProjectConfig(projectName);
+          const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
+          const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
+          const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
+          const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+          const workspacePath = join(project.workspacesPath, workspaceName);
+
+          if (existsSync(workspacePath)) {
+            await removeWorktree(project.bareRepoPath, workspacePath);
+          }
         }
+      } catch {
+        // Ignore cleanup errors
       }
-    } catch {
-      // Ignore cleanup errors
     }
-    
+
     ErrorHandler.handle(error, 'workspace creation');
   }
+}
+
+interface InteractiveResult {
+  projectName: string;
+  branchName: string;
+}
+
+async function selectProjectAndBranch(
+  dbManager: DatabaseManager,
+  preselectedProject?: string
+): Promise<InteractiveResult | null> {
+  const projects = dbManager.getAllProjects();
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow('No projects initialized.'));
+    console.log(chalk.gray('Run `wkt init <repository-url>` to add a project first.'));
+    return null;
+  }
+
+  console.log(chalk.blue('\nCreate new workspace\n'));
+
+  let selectedProject: Project;
+
+  // Project selection - skip if only one project or preselected
+  if (preselectedProject) {
+    const project = dbManager.getProject(preselectedProject);
+    if (!project) {
+      console.log(chalk.red(`Project '${preselectedProject}' not found.`));
+      return null;
+    }
+    selectedProject = project;
+  } else if (projects.length === 1 && projects[0]) {
+    selectedProject = projects[0];
+    console.log(chalk.gray(`Project: ${selectedProject.name}`));
+  } else {
+    const projectChoices = projects.map(p => ({
+      name: `${p.name}  ${chalk.gray(p.repositoryUrl)}`,
+      value: p,
+      short: p.name
+    }));
+
+    const { project } = await inquirer.prompt([{
+      type: 'list',
+      name: 'project',
+      message: 'Select project:',
+      choices: [
+        ...projectChoices,
+        new inquirer.Separator(),
+        { name: chalk.gray('Cancel'), value: null }
+      ],
+      pageSize: 10
+    }]);
+
+    if (!project) return null;
+    selectedProject = project;
+  }
+
+  // Branch name input
+  const { branchName } = await inquirer.prompt([{
+    type: 'input',
+    name: 'branchName',
+    message: 'Branch name or ticket ID:',
+    validate: (input: string) => {
+      if (!input.trim()) return 'Branch name is required';
+      return true;
+    }
+  }]);
+
+  if (!branchName.trim()) return null;
+
+  return {
+    projectName: selectedProject.name,
+    branchName: branchName.trim()
+  };
 }

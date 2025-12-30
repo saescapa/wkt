@@ -17,6 +17,11 @@ import { ErrorHandler } from './utils/errors.js';
 
 // Global error handlers
 process.on('unhandledRejection', (reason: unknown) => {
+  // User pressed Ctrl+C during an interactive prompt - exit silently
+  if (reason instanceof Error && reason.name === 'ExitPromptError') {
+    process.exit(130); // 128 + SIGINT (2)
+  }
+
   logger.debug('Unhandled promise rejection:', reason);
   if (reason instanceof Error) {
     ErrorHandler.handle(reason, 'unhandled rejection');
@@ -70,8 +75,8 @@ program.commandsGroup('Workspace Management:');
 program
   .command('create')
   .description('Create a new workspace')
-  .argument('<project>', 'Project name')
-  .argument('<branch-name>', 'Branch name')
+  .argument('[project]', 'Project name (interactive if omitted)')
+  .argument('[branch-name]', 'Branch name (interactive if omitted)')
   .option('--from <branch>', 'Base branch (default: main/master)', 'main')
   .option('--name <name>', 'Custom workspace directory name')
   .option('--description <text>', 'Workspace description (e.g., "Splits feature")')
@@ -117,7 +122,7 @@ program
 program
   .command('rename')
   .description('Rename current workspace (optionally with new branch)')
-  .argument('<new-name>', 'New workspace/branch name')
+  .argument('[new-name]', 'New workspace/branch name (interactive if omitted)')
   .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: main)')
   .option('--no-rebase', 'Simple rename: rename branch in-place without creating new branch or rebasing')
   .option('--name <name>', 'Custom workspace directory name (default: inferred from branch name)')
@@ -146,6 +151,7 @@ program
   .description('Run a predefined script in a workspace')
   .argument('[script-name]', 'Name of the script to run (or "list" to show available scripts). If not provided, shows interactive selection')
   .argument('[workspace]', 'Workspace identifier (optional, uses current workspace if not specified). Use "." for current workspace')
+  .option('-s, --search <query>', 'Filter scripts by fuzzy search')
   .option('--force', 'Skip confirmation prompts')
   .option('--dry', 'Show what would be executed (dry run)')
   .option('--timeout <ms>', 'Script timeout in milliseconds')

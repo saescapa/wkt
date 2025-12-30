@@ -1,5 +1,6 @@
 import chalk from 'chalk';
-import inquirer from 'inquirer';
+import search, { Separator } from '@inquirer/search';
+import Fuse from 'fuse.js';
 import type { RunCommandOptions, Workspace, ScriptConfig, ScriptDefinition } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
@@ -68,9 +69,9 @@ export async function runCommand(
     process.exit(1);
   }
 
-  // Handle no script name provided - show interactive selection
-  if (!scriptName) {
-    const selectedScript = await selectScriptInteractively(workspace, scriptConfig);
+  // Handle no script name provided or search mode - show interactive selection
+  if (!scriptName || options.search) {
+    const selectedScript = await selectScriptInteractively(workspace, scriptConfig, options.search);
     if (!selectedScript) {
       console.log(chalk.yellow('Script selection cancelled'));
       return;
@@ -200,16 +201,29 @@ function matchesPattern(text: string, pattern: string): boolean {
   return regex.test(text);
 }
 
-async function selectScriptInteractively(workspace: Workspace, scriptConfig: ScriptConfig): Promise<string | null> {
-  const availableScripts: Array<{name: string, description: string, source: string}> = [];
+interface ScriptChoice {
+  name: string;
+  description: string;
+  command?: string;
+  category: 'script' | 'workspace' | 'shortcut';
+  target?: string;
+}
 
-  // Collect all scripts (already merged by source priority)
+async function selectScriptInteractively(
+  workspace: Workspace,
+  scriptConfig: ScriptConfig,
+  _searchQuery?: string
+): Promise<string | null> {
+  const allScripts: ScriptChoice[] = [];
+
+  // Collect global scripts
   if (scriptConfig.scripts) {
     for (const [name, script] of Object.entries(scriptConfig.scripts)) {
-      availableScripts.push({
+      allScripts.push({
         name,
-        description: script.description || script.command?.join(' ') || 'No description',
-        source: 'available'
+        description: script.description || '',
+        command: script.command?.join(' '),
+        category: 'script'
       });
     }
   }
@@ -220,12 +234,12 @@ async function selectScriptInteractively(workspace: Workspace, scriptConfig: Scr
       if (matchesPattern(workspace.name, pattern) || matchesPattern(workspace.branchName, pattern)) {
         if (config.scripts) {
           for (const [name, script] of Object.entries(config.scripts)) {
-            // Don't duplicate if already exists in global
-            if (!availableScripts.find(s => s.name === name)) {
-              availableScripts.push({
+            if (!allScripts.find(s => s.name === name)) {
+              allScripts.push({
                 name,
-                description: script.description || script.command?.join(' ') || 'No description',
-                source: 'workspace-specific'
+                description: script.description || '',
+                command: script.command?.join(' '),
+                category: 'workspace'
               });
             }
           }
@@ -234,54 +248,95 @@ async function selectScriptInteractively(workspace: Workspace, scriptConfig: Scr
     }
   }
 
-  // Handle shortcuts
-  const shortcuts: Array<{name: string, description: string, source: string}> = [];
+  // Collect shortcuts
   if (scriptConfig.shortcuts) {
     for (const [shortcut, target] of Object.entries(scriptConfig.shortcuts)) {
-      shortcuts.push({
+      allScripts.push({
         name: shortcut,
-        description: `Shortcut for "${target}"`,
-        source: 'shortcut'
+        description: `→ ${target}`,
+        category: 'shortcut',
+        target
       });
     }
   }
 
-  if (availableScripts.length === 0 && shortcuts.length === 0) {
+  if (allScripts.length === 0) {
     console.log(chalk.yellow('No scripts available in this workspace'));
     console.log(chalk.gray('Add scripts to .wkt.yaml in your project root or global config'));
     return null;
   }
 
-  // Combine scripts and shortcuts for selection
-  const allOptions = [
-    ...availableScripts.map(script => ({
-      name: `${chalk.bold(script.name)} ${chalk.gray(`(${script.source})`)}`,
-      value: script.name,
-      short: script.name
-    })),
-    ...shortcuts.map(shortcut => ({
-      name: `${chalk.bold(shortcut.name)} ${chalk.cyan('→')} ${chalk.gray(shortcut.description)}`,
-      value: shortcut.name,
-      short: shortcut.name
-    }))
-  ];
+  // Create fuse instance for fuzzy search
+  const fuse = new Fuse(allScripts, {
+    keys: ['name', 'description', 'command', 'target'],
+    threshold: 0.4,
+    includeScore: true,
+  });
 
-  console.log(chalk.blue(`Available scripts for ${workspace.projectName}/${workspace.name}:`));
+  console.log(chalk.blue(`\nScripts for ${workspace.projectName}/${workspace.name}`));
+  console.log(chalk.gray('Type to filter, Enter to select\n'));
 
-  const { selectedScript } = await inquirer.prompt([{
-    type: 'list',
-    name: 'selectedScript',
-    message: 'Select a script to run:',
-    choices: [
-      ...allOptions,
-      new inquirer.Separator(),
-      {
-        name: chalk.gray('Cancel'),
-        value: null
+  type SearchChoice = { name: string; value: string | null; description?: string } | Separator;
+
+  const selectedScript = await search<string | null>({
+    message: 'Run script:',
+    source: async (input: string | undefined) => {
+      const term = input?.trim() || '';
+
+      // Filter scripts based on input
+      let filtered: ScriptChoice[];
+      if (!term) {
+        filtered = allScripts;
+      } else {
+        const results = fuse.search(term);
+        filtered = results.map(r => r.item);
       }
-    ],
-    pageSize: 15
-  }]);
+
+      // Group by category
+      const scripts = filtered.filter(s => s.category === 'script');
+      const workspace = filtered.filter(s => s.category === 'workspace');
+      const shortcuts = filtered.filter(s => s.category === 'shortcut');
+
+      // Build choices with groups
+      const choices: SearchChoice[] = [];
+
+      if (scripts.length > 0) {
+        choices.push(new Separator(chalk.dim('─── Scripts ───')));
+        for (const script of scripts) {
+          choices.push({
+            name: script.name,
+            value: script.name,
+            description: script.description || script.command || ''
+          });
+        }
+      }
+
+      if (workspace.length > 0) {
+        choices.push(new Separator(chalk.dim('─── Workspace ───')));
+        for (const script of workspace) {
+          choices.push({
+            name: script.name,
+            value: script.name,
+            description: script.description || script.command || ''
+          });
+        }
+      }
+
+      if (shortcuts.length > 0) {
+        choices.push(new Separator(chalk.dim('─── Shortcuts ───')));
+        for (const script of shortcuts) {
+          choices.push({
+            name: script.name,
+            value: script.name,
+            description: script.description
+          });
+        }
+      }
+
+      return choices;
+    },
+    pageSize: 15,
+  });
 
   return selectedScript;
 }

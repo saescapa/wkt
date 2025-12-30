@@ -1,8 +1,8 @@
 import { join, basename } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import type { InitCommandOptions, Project } from '../core/types.js';
+import type { InitCommandOptions, Project, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import {
@@ -11,7 +11,12 @@ import {
   cloneBareRepository,
   getDefaultBranch,
   fetchAll,
+  createWorktree,
+  getWorkspaceStatus,
 } from '../utils/git/index.js';
+import { BranchInference } from '../utils/branch-inference.js';
+import { LocalFilesManager } from '../utils/local-files.js';
+import { SafeScriptExecutor } from '../utils/script-executor.js';
 
 export async function initCommand(
   repositoryUrl?: string,
@@ -64,10 +69,35 @@ export async function initCommand(
         process.exit(1);
       }
     } else {
-      console.error(chalk.red('Error: No repository URL provided and current directory is not a git repository.'));
-      console.log('Usage: wkt init <repository-url> [project-name]');
-      process.exit(1);
+      // Interactive mode - prompt for repository URL
+      console.log(chalk.blue('\nInitialize new project\n'));
+
+      const { inputUrl } = await inquirer.prompt([{
+        type: 'input',
+        name: 'inputUrl',
+        message: 'Repository URL (git clone URL):',
+        validate: (input: string) => {
+          if (!input.trim()) return 'Repository URL is required';
+          if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
+            return 'Please enter a valid git repository URL';
+          }
+          return true;
+        }
+      }]);
+
+      if (!inputUrl.trim()) {
+        console.log(chalk.yellow('Initialization cancelled'));
+        return;
+      }
+      repoUrl = inputUrl.trim();
     }
+  }
+
+  // At this point repoUrl must be set
+  if (!repoUrl) {
+    console.error(chalk.red('Error: Repository URL is required.'));
+    process.exit(1);
+    return; // TypeScript flow analysis
   }
 
   if (!inferredProjectName) {
@@ -149,18 +179,63 @@ export async function initCommand(
 
     dbManager.addProject(project);
 
+    // Create the main workspace automatically
+    console.log(chalk.gray(`Creating main workspace...`));
+
+    const localFilesManager = new LocalFilesManager();
+    const projectConfig = configManager.getProjectConfig(inferredProjectName);
+
+    if (!existsSync(workspacesPath)) {
+      mkdirSync(workspacesPath, { recursive: true });
+    }
+
+    const mainWorkspacePath = join(workspacesPath, 'main');
+    await createWorktree(bareRepoPath, mainWorkspacePath, defaultBranch, defaultBranch);
+
+    const status = await getWorkspaceStatus(mainWorkspacePath);
+    const workspaceID = BranchInference.generateWorkspaceId(inferredProjectName, 'main');
+
+    const workspace: Workspace = {
+      id: workspaceID,
+      projectName: inferredProjectName,
+      name: 'main',
+      branchName: defaultBranch,
+      path: mainWorkspacePath,
+      baseBranch: defaultBranch,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+      status,
+      commitsAhead: 0,
+      commitsBehind: 0,
+    };
+
+    dbManager.addWorkspace(workspace);
+    dbManager.setCurrentWorkspace(workspaceID);
+
+    // Setup local files (symlinks and copies)
+    await localFilesManager.setupLocalFiles(project, mainWorkspacePath, projectConfig, globalConfig, {
+      name: 'main',
+      branchName: defaultBranch
+    });
+
+    // Execute post-creation hooks
+    const scriptConfig = projectConfig.scripts || globalConfig.scripts;
+    if (scriptConfig) {
+      const context = SafeScriptExecutor.createContext(workspace, project);
+      await SafeScriptExecutor.executePostCreationHooks(context, scriptConfig, {});
+    }
+
     console.log(chalk.green(`✓ Successfully initialized project '${inferredProjectName}'`));
     console.log(chalk.gray(`  Repository: ${repoUrl}`));
     console.log(chalk.gray(`  Default branch: ${defaultBranch}`));
     if (selectedTemplate) {
       console.log(chalk.gray(`  Template: ${selectedTemplate}`));
     }
-    console.log(chalk.gray(`  Bare repo: ${bareRepoPath}`));
-    console.log(chalk.gray(`  Workspaces: ${workspacesPath}`));
+    console.log(chalk.gray(`  Workspace: ${mainWorkspacePath}`));
 
-    console.log(chalk.blue('\nNext steps:'));
-    console.log(`  wkt create ${inferredProjectName} <branch-name>    # Create a new workspace`);
-    console.log(`  wkt list                                         # List all workspaces`);
+    console.log(chalk.blue('\nTo start working:'));
+    console.log(chalk.bold(`  cd "${mainWorkspacePath}"`));
+    console.log(chalk.gray(`\nOr use: wkt switch ${inferredProjectName}/main`));
 
   } catch (error) {
     console.error(chalk.red(`Error initializing project: ${error instanceof Error ? error.message : error}`));
