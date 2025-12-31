@@ -352,6 +352,6 @@ export async function renameCommand(
     }
 
   } catch (error) {
-    ErrorHandler.handle(error, 'workspace rename');
+    ErrorHandler.handle(error);
   }
 }

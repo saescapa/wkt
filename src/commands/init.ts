@@ -17,116 +17,120 @@ import {
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
+import {
+  ErrorHandler,
+  WKTError,
+  ValidationError,
+  DirectoryExistsError,
+  GitRepositoryError,
+} from '../utils/errors.js';
 
 export async function initCommand(
   repositoryUrl?: string,
   projectName?: string,
   options: InitCommandOptions = {}
 ): Promise<void> {
-  const configManager = new ConfigManager();
-  const dbManager = new DatabaseManager();
+  try {
+    const configManager = new ConfigManager();
+    const dbManager = new DatabaseManager();
 
-  if (options.list) {
-    const projects = dbManager.getAllProjects();
-    if (projects.length === 0) {
-      console.log(chalk.yellow('No projects initialized yet.'));
-      console.log('Use `wkt init <repository-url> [project-name]` to get started.');
+    if (options.list) {
+      const projects = dbManager.getAllProjects();
+      if (projects.length === 0) {
+        console.log(chalk.yellow('No projects initialized yet.'));
+        console.log(chalk.dim('Use `wkt init <repository-url> [project-name]` to get started.'));
+        return;
+      }
+
+      console.log(chalk.bold('\nManaged Projects:'));
+      projects.forEach(project => {
+        console.log(`  ${chalk.green('●')} ${chalk.bold(project.name)}`);
+        console.log(`    ${chalk.gray(project.repositoryUrl)}`);
+        if (project.template) {
+          console.log(`    ${chalk.gray(`Template: ${project.template}`)}`);
+        }
+        console.log(`    ${chalk.gray(`Created: ${project.createdAt.toLocaleDateString()}`)}`);
+      });
       return;
     }
 
-    console.log(chalk.bold('\nManaged Projects:'));
-    projects.forEach(project => {
-      console.log(`  ${chalk.green('●')} ${chalk.bold(project.name)}`);
-      console.log(`    ${chalk.gray(project.repositoryUrl)}`);
-      if (project.template) {
-        console.log(`    ${chalk.gray(`Template: ${project.template}`)}`);
-      }
-      console.log(`    ${chalk.gray(`Created: ${project.createdAt.toLocaleDateString()}`)}`);
-    });
-    return;
-  }
+    // Handle applying template to existing project
+    if (options.applyTemplate) {
+      await applyTemplateToExistingProject(repositoryUrl, options.template);
+      return;
+    }
 
-  // Handle applying template to existing project
-  if (options.applyTemplate) {
-    await applyTemplateToExistingProject(repositoryUrl, options.template);
-    return;
-  }
+    let repoUrl = repositoryUrl;
+    let inferredProjectName = projectName;
 
-  let repoUrl = repositoryUrl;
-  let inferredProjectName = projectName;
-
-  if (!repoUrl) {
-    if (isGitRepository(process.cwd())) {
-      try {
-        repoUrl = await getBareRepoUrl(process.cwd());
-        if (!inferredProjectName) {
-          inferredProjectName = basename(process.cwd());
-        }
-        console.log(chalk.blue(`Found git repository: ${repoUrl}`));
-      } catch {
-        console.error(chalk.red('Error: Current directory is not a valid git repository or has no remote origin.'));
-        console.log('Usage: wkt init <repository-url> [project-name]');
-        process.exit(1);
-      }
-    } else {
-      // Interactive mode - prompt for repository URL
-      console.log(chalk.blue('\nInitialize new project\n'));
-
-      const { inputUrl } = await inquirer.prompt([{
-        type: 'input',
-        name: 'inputUrl',
-        message: 'Repository URL (git clone URL):',
-        validate: (input: string) => {
-          if (!input.trim()) return 'Repository URL is required';
-          if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
-            return 'Please enter a valid git repository URL';
+    if (!repoUrl) {
+      if (isGitRepository(process.cwd())) {
+        try {
+          repoUrl = await getBareRepoUrl(process.cwd());
+          if (!inferredProjectName) {
+            inferredProjectName = basename(process.cwd());
           }
-          return true;
+          console.log(chalk.blue(`Found git repository: ${repoUrl}`));
+        } catch {
+          throw new GitRepositoryError('Current directory is not a valid git repository or has no remote origin');
         }
-      }]);
+      } else {
+        // Interactive mode - prompt for repository URL
+        console.log(chalk.blue('\nInitialize new project\n'));
 
-      if (!inputUrl.trim()) {
-        console.log(chalk.yellow('Initialization cancelled'));
-        return;
+        const { inputUrl } = await inquirer.prompt([{
+          type: 'input',
+          name: 'inputUrl',
+          message: 'Repository URL (git clone URL):',
+          validate: (input: string) => {
+            if (!input.trim()) return 'Repository URL is required';
+            if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
+              return 'Please enter a valid git repository URL';
+            }
+            return true;
+          }
+        }]);
+
+        if (!inputUrl.trim()) {
+          console.log(chalk.yellow('Initialization cancelled'));
+          return;
+        }
+        repoUrl = inputUrl.trim();
       }
-      repoUrl = inputUrl.trim();
     }
-  }
 
-  // At this point repoUrl must be set
-  if (!repoUrl) {
-    console.error(chalk.red('Error: Repository URL is required.'));
-    process.exit(1);
-    return; // TypeScript flow analysis
-  }
-
-  if (!inferredProjectName) {
-    const urlParts = repoUrl.split('/');
-    const lastPart = urlParts[urlParts.length - 1];
-    if (!lastPart) {
-      console.error(chalk.red('Error: Could not infer project name from repository URL.'));
-      process.exit(1);
+    // At this point repoUrl must be set
+    if (!repoUrl) {
+      throw new ValidationError('repository URL', 'Repository URL is required');
     }
-    inferredProjectName = lastPart.replace(/\.git$/, '');
-  }
 
-  if (dbManager.getProject(inferredProjectName)) {
-    console.error(chalk.red(`Error: Project '${inferredProjectName}' already exists.`));
-    console.log('Use `wkt init --list` to see all projects.');
-    process.exit(1);
-  }
+    if (!inferredProjectName) {
+      const urlParts = repoUrl.split('/');
+      const lastPart = urlParts[urlParts.length - 1];
+      if (!lastPart) {
+        throw new ValidationError('project name', 'Could not infer project name from repository URL');
+      }
+      inferredProjectName = lastPart.replace(/\.git$/, '');
+    }
 
-  console.log(chalk.blue(`Initializing project '${inferredProjectName}'...`));
+    if (dbManager.getProject(inferredProjectName)) {
+      throw new WKTError(
+        `Project '${inferredProjectName}' already exists`,
+        'PROJECT_EXISTS',
+        true,
+        [{ text: 'See existing projects', command: 'wkt init --list' }]
+      );
+    }
 
-  try {
+    console.log(chalk.blue(`Initializing project '${inferredProjectName}'...`));
+
     configManager.ensureConfigDir();
 
     const projectsRoot = configManager.getProjectsRoot();
     const bareRepoPath = join(projectsRoot, inferredProjectName);
 
     if (existsSync(bareRepoPath)) {
-      console.error(chalk.red(`Error: Directory '${bareRepoPath}' already exists.`));
-      process.exit(1);
+      throw new DirectoryExistsError(bareRepoPath);
     }
 
     console.log(chalk.gray(`Cloning bare repository to ${bareRepoPath}...`));
@@ -238,8 +242,7 @@ export async function initCommand(
     console.log(chalk.gray(`\nOr use: wkt switch ${inferredProjectName}/main`));
 
   } catch (error) {
-    console.error(chalk.red(`Error initializing project: ${error instanceof Error ? error.message : error}`));
-    process.exit(1);
+    ErrorHandler.handle(error);
   }
 }
 
@@ -253,7 +256,8 @@ async function applyTemplateToExistingProject(projectName?: string, templateName
   if (!selectedProject) {
     const projects = dbManager.getAllProjects();
     if (projects.length === 0) {
-      console.log(chalk.yellow('No projects found. Initialize a project first with `wkt init`'));
+      console.log(chalk.yellow('No projects found.'));
+      console.log(chalk.dim('Initialize a project first: wkt init <repository-url>'));
       return;
     }
 
@@ -270,15 +274,19 @@ async function applyTemplateToExistingProject(projectName?: string, templateName
 
   const project = dbManager.getProject(selectedProject);
   if (!project) {
-    console.error(chalk.red(`Error: Project '${selectedProject}' not found.`));
-    process.exit(1);
+    throw new WKTError(
+      `Project '${selectedProject}' not found`,
+      'PROJECT_NOT_FOUND',
+      true,
+      [{ text: 'See existing projects', command: 'wkt init --list' }]
+    );
   }
 
   // Get template name
   const availableTemplates = globalConfig.project_templates ? Object.keys(globalConfig.project_templates) : [];
   if (availableTemplates.length === 0) {
     console.log(chalk.yellow('No project templates defined in config.'));
-    console.log(chalk.gray('Add templates to ~/.wkt/config.yaml under project_templates'));
+    console.log(chalk.dim('Add templates to ~/.wkt/config.yaml under project_templates'));
     return;
   }
 
@@ -296,8 +304,12 @@ async function applyTemplateToExistingProject(projectName?: string, templateName
   }
 
   if (!globalConfig.project_templates?.[selectedTemplate]) {
-    console.error(chalk.red(`Error: Template '${selectedTemplate}' not found.`));
-    process.exit(1);
+    throw new WKTError(
+      `Template '${selectedTemplate}' not found`,
+      'TEMPLATE_NOT_FOUND',
+      true,
+      [{ text: 'Check your config.yaml for available templates' }]
+    );
   }
 
   // Apply template

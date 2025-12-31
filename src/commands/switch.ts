@@ -4,7 +4,7 @@ import Fuse from 'fuse.js';
 import type { SwitchCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
-import { ErrorHandler, WorkspaceNotFoundError } from '../utils/errors.js';
+import { ErrorHandler, WorkspaceNotFoundError, NoWorkspaceError } from '../utils/errors.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import { formatTimeAgo } from '../utils/format.js';
 
@@ -18,7 +18,7 @@ export async function switchCommand(
     if (workspaceName === '-') {
       const current = dbManager.getCurrentWorkspace();
       if (!current) {
-        throw new WorkspaceNotFoundError('previous workspace');
+        throw new NoWorkspaceError();
       }
       workspaceName = current.name;
     }
@@ -28,12 +28,12 @@ export async function switchCommand(
     if (options.project) {
       workspaces = dbManager.getWorkspacesByProject(options.project);
       if (workspaces.length === 0) {
-        throw new WorkspaceNotFoundError(`workspaces for project '${options.project}'`);
+        throw new WorkspaceNotFoundError(`project '${options.project}'`);
       }
     } else {
       workspaces = dbManager.getAllWorkspaces();
       if (workspaces.length === 0) {
-        throw new WorkspaceNotFoundError('any workspaces');
+        throw new NoWorkspaceError();
       }
     }
 
@@ -45,19 +45,8 @@ export async function switchCommand(
       const matches = findWorkspaceMatches(workspaces, workspaceName);
 
       if (matches.length === 0) {
-        console.error(chalk.red(`Error: No workspace found matching '${workspaceName}'.`));
-        
-        if (options.create) {
-          console.log(chalk.blue('Use --create flag to create a new workspace.'));
-          // TODO: Implement create logic here
-          return;
-        }
-        
-        console.log('Available workspaces:');
-        workspaces.forEach(w => {
-          console.log(`  ${w.projectName}/${w.name}`);
-        });
-        throw new WorkspaceNotFoundError(workspaceName);
+        const availableWorkspaces = workspaces.map(w => `${w.projectName}/${w.name}`);
+        throw new WorkspaceNotFoundError(workspaceName, availableWorkspaces);
       }
 
       if (matches.length === 1) {
@@ -162,7 +151,8 @@ export async function switchCommand(
     }
 
   } catch (error) {
-    ErrorHandler.handle(error, 'workspace switch');
+    // In path-only mode, use minimal error output to avoid breaking shell integration
+    ErrorHandler.handle(error, { minimal: options.pathOnly });
   }
 }
 

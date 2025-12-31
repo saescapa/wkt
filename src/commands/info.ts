@@ -132,6 +132,8 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
     console.log();
 
   } catch (error) {
-    ErrorHandler.handle(error, 'workspace info');
+    // Use minimal mode for shell integration options
+    const isShellMode = options.descriptionOnly || options.branchOnly || options.nameOnly;
+    ErrorHandler.handle(error, { minimal: isShellMode });
   }
 }
