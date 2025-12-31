@@ -24,16 +24,16 @@ process.on('unhandledRejection', (reason: unknown) => {
 
   logger.debug('Unhandled promise rejection:', reason);
   if (reason instanceof Error) {
-    ErrorHandler.handle(reason, 'unhandled rejection');
+    ErrorHandler.handle(reason);
   } else {
-    console.error(chalk.red('Unhandled rejection:'), reason);
+    console.error(chalk.red('✗ Unhandled rejection:'), reason);
     process.exit(1);
   }
 });
 
 process.on('uncaughtException', (error: Error) => {
   logger.debug('Uncaught exception:', error);
-  ErrorHandler.handle(error, 'uncaught exception');
+  ErrorHandler.handle(error);
 });
 
 program

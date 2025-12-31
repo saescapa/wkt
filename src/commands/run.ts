@@ -5,97 +5,104 @@ import type { RunCommandOptions, Workspace, ScriptConfig, ScriptDefinition } fro
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
+import {
+  ErrorHandler,
+  NoWorkspaceError,
+  ProjectNotFoundError,
+  ConfigurationError,
+} from '../utils/errors.js';
 
 export async function runCommand(
   scriptName?: string,
   workspaceIdentifier?: string,
   options: RunCommandOptions = {}
 ): Promise<void> {
-  const dbManager = new DatabaseManager();
-  const configManager = new ConfigManager();
+  try {
+    const dbManager = new DatabaseManager();
+    const configManager = new ConfigManager();
 
-  // Determine workspace
-  let workspace;
-  if (workspaceIdentifier) {
-    // Handle current workspace shortcut
-    if (workspaceIdentifier === '.') {
+    // Determine workspace
+    let workspace;
+    if (workspaceIdentifier) {
+      // Handle current workspace shortcut
+      if (workspaceIdentifier === '.') {
+        const currentWorkspace = dbManager.getCurrentWorkspaceContext();
+        if (!currentWorkspace) {
+          throw new NoWorkspaceError();
+        }
+        workspaceIdentifier = currentWorkspace.id;
+      }
+
+      const { projectName, workspaceName } = parseWorkspaceIdentifier(workspaceIdentifier);
+      workspace = findWorkspace(projectName, workspaceName, dbManager);
+
+      if (!workspace) {
+        const allWorkspaces = dbManager.getAllWorkspaces();
+        const available = allWorkspaces.map(w => `${w.projectName}/${w.name}`);
+        const { WorkspaceNotFoundError } = await import('../utils/errors.js');
+        throw new WorkspaceNotFoundError(workspaceIdentifier, available);
+      }
+    } else {
+      // Use current workspace (detect from path first, then fall back to stored)
       const currentWorkspace = dbManager.getCurrentWorkspaceContext();
       if (!currentWorkspace) {
-        console.error(chalk.red('No workspace detected. Ensure you are in a workspace directory or use `wkt switch` to select one.'));
-        process.exit(1);
+        throw new NoWorkspaceError();
       }
-      workspaceIdentifier = currentWorkspace.id;
+
+      workspace = currentWorkspace;
     }
 
-    const { projectName, workspaceName } = parseWorkspaceIdentifier(workspaceIdentifier);
-    workspace = findWorkspace(projectName, workspaceName, dbManager);
-    
-    if (!workspace) {
-      console.error(chalk.red(`Workspace not found: ${workspaceIdentifier}`));
-      process.exit(1);
-    }
-  } else {
-    // Use current workspace (detect from path first, then fall back to stored)
-    const currentWorkspace = dbManager.getCurrentWorkspaceContext();
-    if (!currentWorkspace) {
-      console.error(chalk.red('No workspace detected. Ensure you are in a workspace directory or use `wkt switch` to select one.'));
-      process.exit(1);
+    // Get project
+    const project = dbManager.getProject(workspace.projectName);
+    if (!project) {
+      throw new ProjectNotFoundError(workspace.projectName);
     }
 
-    workspace = currentWorkspace;
-  }
+    // Get script configuration (merged from workspace, project, and global)
+    const globalConfig = configManager.getConfig();
+    const projectConfig = configManager.getProjectConfig(workspace.projectName);
+    const workspaceConfig = configManager.getWorkspaceConfig(workspace.path);
 
-  // Get project
-  const project = dbManager.getProject(workspace.projectName);
-  if (!project) {
-    console.error(chalk.red(`Project not found: ${workspace.projectName}`));
-    process.exit(1);
-  }
+    const scriptConfig = mergeScriptConfigs(
+      globalConfig.scripts,
+      projectConfig.scripts,
+      workspaceConfig.scripts
+    );
 
-  // Get script configuration (merged from workspace, project, and global)
-  const globalConfig = configManager.getConfig();
-  const projectConfig = configManager.getProjectConfig(workspace.projectName);
-  const workspaceConfig = configManager.getWorkspaceConfig(workspace.path);
+    if (!scriptConfig) {
+      throw new ConfigurationError('No script configuration found. Add scripts section to .wkt.yaml');
+    }
 
-  const scriptConfig = mergeScriptConfigs(
-    globalConfig.scripts,
-    projectConfig.scripts,
-    workspaceConfig.scripts
-  );
+    // Handle no script name provided or search mode - show interactive selection
+    if (!scriptName || options.search) {
+      const selectedScript = await selectScriptInteractively(workspace, scriptConfig, options.search);
+      if (!selectedScript) {
+        console.log(chalk.yellow('Script selection cancelled'));
+        return;
+      }
+      scriptName = selectedScript;
+    }
 
-  if (!scriptConfig) {
-    console.error(chalk.red('No script configuration found.'));
-    console.log(chalk.gray('Add scripts section to .wkt.yaml in your project root or global config'));
-    process.exit(1);
-  }
-
-  // Handle no script name provided or search mode - show interactive selection
-  if (!scriptName || options.search) {
-    const selectedScript = await selectScriptInteractively(workspace, scriptConfig, options.search);
-    if (!selectedScript) {
-      console.log(chalk.yellow('Script selection cancelled'));
+    // List available scripts if explicitly requested
+    if (scriptName === '--list' || scriptName === 'list') {
+      listAvailableScripts(workspace, scriptConfig);
       return;
     }
-    scriptName = selectedScript;
-  }
 
-  // List available scripts if explicitly requested
-  if (scriptName === '--list' || scriptName === 'list') {
-    listAvailableScripts(workspace, scriptConfig);
-    return;
-  }
+    // Create execution context
+    const context = SafeScriptExecutor.createContext(workspace, project);
 
-  // Create execution context
-  const context = SafeScriptExecutor.createContext(workspace, project);
+    console.log(chalk.blue(`Running script "${scriptName}" in workspace: ${workspace.projectName}/${workspace.name}`));
+    console.log(chalk.gray(`Path: ${workspace.path}`));
 
-  console.log(chalk.blue(`Running script "${scriptName}" in workspace: ${workspace.projectName}/${workspace.name}`));
-  console.log(chalk.gray(`Path: ${workspace.path}`));
+    // Execute the script
+    const success = await SafeScriptExecutor.executeScript(scriptName, context, scriptConfig, options);
 
-  // Execute the script
-  const success = await SafeScriptExecutor.executeScript(scriptName, context, scriptConfig, options);
-  
-  if (!success) {
-    process.exit(1);
+    if (!success) {
+      process.exit(1);
+    }
+  } catch (error) {
+    ErrorHandler.handle(error);
   }
 }
 

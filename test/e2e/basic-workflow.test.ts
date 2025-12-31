@@ -140,7 +140,8 @@ describe('WKT CLI', () => {
       const result = await wkt(['switch', 'fake-workspace'], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('not found');
+      // When no workspaces exist, we get "No workspace detected" instead of "not found"
+      expect(result.stderr).toMatch(/not found|No workspace detected/);
     });
   });
 

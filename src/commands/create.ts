@@ -169,7 +169,7 @@ export async function createCommand(
       }
     }
 
-    ErrorHandler.handle(error, 'workspace creation');
+    ErrorHandler.handle(error);
   }
 }
 
