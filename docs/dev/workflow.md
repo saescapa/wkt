@@ -90,10 +90,23 @@ bun run build       # Output to dist/
 
 Before ending a development session:
 
+### Code Quality
 - [ ] **Tests pass** - `bun test` succeeds
 - [ ] **Types check** - `bun run typecheck` succeeds
 - [ ] **Lint clean** - `bun run lint` succeeds
-- [ ] **Docs updated** - If behavior changed, update relevant docs
-- [ ] **CHANGELOG updated** - Add entry for user-facing changes
-- [ ] **TODOs updated** - Update `docs.local/todos.md` with progress
 - [ ] **Changes verified** - Manual smoke test of changed functionality
+
+### TODO Lists
+- [ ] **Project TODOs** - Update `docs.local/todos.md` with progress
+- [ ] **Code TODOs** - Remove stale/resolved TODO comments from code
+- [ ] **CHANGELOG** - Add entry for user-facing changes
+
+### Documentation
+- [ ] **Architecture docs** - Update `docs/dev/architecture.md` if codebase structure changed
+- [ ] **User guide** - Update `docs/reference/user-guide.md` if user-facing behavior changed
+- [ ] **Code examples** - Ensure examples in docs still work
+
+### UI Copy & Help
+- [ ] **CLI help text** - Update command descriptions and option help in source
+- [ ] **Error messages** - Update if behavior changed
+- [ ] **Help/docs sync** - Ensure `--help` output matches documentation
