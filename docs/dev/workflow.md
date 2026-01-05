@@ -51,10 +51,14 @@ bun test:e2e        # E2E only
 bun test:watch      # Watch mode
 ```
 
-**Requirements:**
-- New features need tests
-- Bug fixes need regression tests
-- E2E tests for CLI command changes
+**Requirements (mandatory for all work):**
+- **New features** - Write tests before marking complete
+- **Bug fixes** - Add regression tests that would have caught the issue
+- **Refactors** - Verify existing tests pass; update if behavior changed
+- **Modified code** - Update any tests that reference changed functionality
+- **CLI commands** - E2E tests for any command changes
+
+No code change is complete without corresponding test coverage.
 
 ## Development Setup
 
@@ -90,11 +94,14 @@ bun run build       # Output to dist/
 
 Before ending a development session:
 
-### Code Quality
+### Testing
+- [ ] **Tests written/updated** - All code changes have corresponding test coverage
 - [ ] **Tests pass** - `bun test` succeeds
+- [ ] **Changes verified** - Manual smoke test of changed functionality
+
+### Code Quality
 - [ ] **Types check** - `bun run typecheck` succeeds
 - [ ] **Lint clean** - `bun run lint` succeeds
-- [ ] **Changes verified** - Manual smoke test of changed functionality
 
 ### TODO Lists
 - [ ] **Project TODOs** - Update `docs.local/todos.md` with progress
