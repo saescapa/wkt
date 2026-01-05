@@ -116,7 +116,6 @@ export async function createCommand(
     };
 
     dbManager.addWorkspace(workspace);
-    dbManager.setCurrentWorkspace(workspaceId);
 
     // Setup local files (symlinks and copies)
     await localFilesManager.setupLocalFiles(project, workspacePath, projectConfig, config, {

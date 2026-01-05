@@ -16,7 +16,7 @@ export async function switchCommand(
     const dbManager = new DatabaseManager();
 
     if (workspaceName === '-') {
-      const current = dbManager.getCurrentWorkspace();
+      const current = dbManager.getCurrentWorkspaceContext();
       if (!current) {
         throw new NoWorkspaceError();
       }
@@ -55,7 +55,7 @@ export async function switchCommand(
         // Handle multiple matches - if --path-only, try to be smart about selection
         if (options.pathOnly) {
           // For path-only mode (used by shell functions), implement cycling behavior
-          const currentWorkspace = dbManager.getCurrentWorkspace();
+          const currentWorkspace = dbManager.getCurrentWorkspaceContext();
 
           if (currentWorkspace && matches.find(w => w.id === currentWorkspace.id)) {
             // Current workspace is one of the matches - cycle to the next one
@@ -106,7 +106,7 @@ export async function switchCommand(
     const globalConfig = configManager.getConfig();
 
     // Execute pre_switch hooks for the current workspace (teardown)
-    const currentWorkspace = dbManager.getCurrentWorkspace();
+    const currentWorkspace = dbManager.getCurrentWorkspaceContext();
     if (currentWorkspace && currentWorkspace.id !== selectedWorkspace.id) {
       const currentProject = dbManager.getProject(currentWorkspace.projectName);
       if (currentProject) {
@@ -121,7 +121,6 @@ export async function switchCommand(
 
     selectedWorkspace.lastUsed = new Date();
     dbManager.updateWorkspace(selectedWorkspace);
-    dbManager.setCurrentWorkspace(selectedWorkspace.id);
 
     // Execute post_switch hooks for the new workspace (setup)
     const newProject = dbManager.getProject(selectedWorkspace.projectName);

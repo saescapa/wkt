@@ -124,7 +124,6 @@ export interface WKTDatabase {
     version: string;
     schemaVersion: number;
     lastCleanup: Date;
-    currentWorkspace?: string;
   };
 }
 

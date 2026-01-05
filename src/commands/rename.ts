@@ -29,26 +29,10 @@ export async function renameCommand(
     const dbManager = new DatabaseManager();
     const configManager = new ConfigManager();
 
-    // Get current workspace
-    const currentWorkspace = dbManager.getCurrentWorkspace();
-    if (!currentWorkspace) {
-      // Try to detect workspace from current directory
-      const cwd = process.cwd();
-      const allWorkspaces = dbManager.getAllWorkspaces();
-      const detectedWorkspace = allWorkspaces.find(w => cwd.startsWith(w.path));
-
-      if (!detectedWorkspace) {
-        throw new WorkspaceNotFoundError('current workspace - run this command from within a workspace directory');
-      }
-
-      // Use detected workspace
-      console.log(chalk.blue(`Detected workspace: ${detectedWorkspace.name}`));
-      dbManager.setCurrentWorkspace(detectedWorkspace.id);
-    }
-
-    const workspace = dbManager.getCurrentWorkspace();
+    // Get current workspace from path
+    const workspace = dbManager.getCurrentWorkspaceContext();
     if (!workspace) {
-      throw new WorkspaceNotFoundError('current workspace');
+      throw new WorkspaceNotFoundError('current workspace - run this command from within a workspace directory');
     }
 
     const project = dbManager.getProject(workspace.projectName);
@@ -331,7 +315,6 @@ export async function renameCommand(
       // Remove old workspace and add with new ID
       dbManager.removeWorkspace(oldId);
       dbManager.addWorkspace(workspace);
-      dbManager.setCurrentWorkspace(workspace.id);
     } else {
       dbManager.updateWorkspace(workspace);
     }
