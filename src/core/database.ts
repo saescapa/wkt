@@ -199,4 +199,37 @@ export class DatabaseManager {
     // Fall back to stored current workspace
     return this.getCurrentWorkspace();
   }
+
+  getPooledWorkspaces(projectName: string): Workspace[] {
+    return this.getWorkspacesByProject(projectName)
+      .filter(w => w.mode === 'pooled')
+      .sort((a, b) => a.lastUsed.getTime() - b.lastUsed.getTime()); // Oldest first
+  }
+
+  getClaimedWorkspaces(projectName: string): Workspace[] {
+    return this.getWorkspacesByProject(projectName)
+      .filter(w => w.mode === 'claimed')
+      .sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime()); // Most recent first
+  }
+
+  getNextPoolWorkspaceName(projectName: string): string {
+    const allWorkspaces = this.getWorkspacesByProject(projectName);
+    const poolWorkspaces = allWorkspaces.filter(w =>
+      w.mode === 'pooled' || w.mode === 'claimed' || w.name.startsWith('wksp-')
+    );
+
+    // Find the highest wksp-N number and increment
+    let maxNum = 0;
+    for (const ws of poolWorkspaces) {
+      const match = ws.name.match(/^wksp-(\d+)$/);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+
+    return `wksp-${maxNum + 1}`;
+  }
 }

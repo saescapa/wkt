@@ -192,6 +192,97 @@ describe('DatabaseManager', () => {
     });
   });
 
+  describe('pool workspace management', () => {
+    let testProject: Project;
+
+    beforeEach(() => {
+      testProject = testEnv.createMockProject('test-project');
+      dbManager.addProject(testProject);
+    });
+
+    it('should get pooled workspaces sorted by lastUsed (oldest first)', () => {
+      const pooled1 = testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled');
+      const pooled2 = testEnv.createMockWorkspace('test-project', 'wksp-2', 'pooled');
+      const branched = testEnv.createMockWorkspace('test-project', 'feature-1', 'branched');
+
+      // Set different lastUsed times
+      pooled1.lastUsed = new Date('2024-01-01');
+      pooled2.lastUsed = new Date('2024-01-02');
+
+      dbManager.addWorkspace(pooled1);
+      dbManager.addWorkspace(pooled2);
+      dbManager.addWorkspace(branched);
+
+      const pooled = dbManager.getPooledWorkspaces('test-project');
+      expect(pooled).toHaveLength(2);
+      expect(pooled[0].name).toBe('wksp-1'); // Oldest first
+      expect(pooled[1].name).toBe('wksp-2');
+    });
+
+    it('should get claimed workspaces sorted by lastUsed (most recent first)', () => {
+      const claimed1 = testEnv.createMockWorkspace('test-project', 'wksp-1', 'claimed');
+      const claimed2 = testEnv.createMockWorkspace('test-project', 'wksp-2', 'claimed');
+      const pooled = testEnv.createMockWorkspace('test-project', 'wksp-3', 'pooled');
+
+      // Set different lastUsed times
+      claimed1.lastUsed = new Date('2024-01-01');
+      claimed2.lastUsed = new Date('2024-01-02');
+
+      dbManager.addWorkspace(claimed1);
+      dbManager.addWorkspace(claimed2);
+      dbManager.addWorkspace(pooled);
+
+      const claimed = dbManager.getClaimedWorkspaces('test-project');
+      expect(claimed).toHaveLength(2);
+      expect(claimed[0].name).toBe('wksp-2'); // Most recent first
+      expect(claimed[1].name).toBe('wksp-1');
+    });
+
+    it('should return empty array when no pooled workspaces exist', () => {
+      const branched = testEnv.createMockWorkspace('test-project', 'feature-1', 'branched');
+      dbManager.addWorkspace(branched);
+
+      const pooled = dbManager.getPooledWorkspaces('test-project');
+      expect(pooled).toHaveLength(0);
+    });
+
+    it('should get next pool workspace name', () => {
+      const name1 = dbManager.getNextPoolWorkspaceName('test-project');
+      expect(name1).toBe('wksp-1');
+
+      const wksp1 = testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled');
+      dbManager.addWorkspace(wksp1);
+
+      const name2 = dbManager.getNextPoolWorkspaceName('test-project');
+      expect(name2).toBe('wksp-2');
+
+      const wksp5 = testEnv.createMockWorkspace('test-project', 'wksp-5', 'claimed');
+      dbManager.addWorkspace(wksp5);
+
+      const name3 = dbManager.getNextPoolWorkspaceName('test-project');
+      expect(name3).toBe('wksp-6');
+    });
+
+    it('should filter pooled workspaces by project', () => {
+      const project2 = testEnv.createMockProject('project-2');
+      dbManager.addProject(project2);
+
+      const pooled1 = testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled');
+      const pooled2 = testEnv.createMockWorkspace('project-2', 'wksp-2', 'pooled');
+
+      dbManager.addWorkspace(pooled1);
+      dbManager.addWorkspace(pooled2);
+
+      const testProjectPooled = dbManager.getPooledWorkspaces('test-project');
+      expect(testProjectPooled).toHaveLength(1);
+      expect(testProjectPooled[0].name).toBe('wksp-1');
+
+      const project2Pooled = dbManager.getPooledWorkspaces('project-2');
+      expect(project2Pooled).toHaveLength(1);
+      expect(project2Pooled[0].name).toBe('wksp-2');
+    });
+  });
+
   describe('current workspace management', () => {
     let testWorkspace: Workspace;
 

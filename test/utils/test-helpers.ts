@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import type { GlobalConfig, Project, Workspace } from '../../src/core/types.js';
+import type { GlobalConfig, Project, Workspace, WorkspaceMode } from '../../src/core/types.js';
 
 export class TestEnvironment {
   public testDir: string;
@@ -73,12 +73,16 @@ export class TestEnvironment {
     };
   }
 
-  createMockWorkspace(projectName: string = 'test-project', workspaceName: string = 'test-workspace'): Workspace {
+  createMockWorkspace(
+    projectName: string = 'test-project',
+    workspaceName: string = 'test-workspace',
+    mode: WorkspaceMode = 'branched'
+  ): Workspace {
     return {
       id: `${projectName}/${workspaceName}`,
       projectName,
       name: workspaceName,
-      branchName: `feature/${workspaceName}`,
+      branchName: mode === 'branched' ? `feature/${workspaceName}` : 'HEAD',
       path: join(this.workspacesDir, projectName, workspaceName),
       baseBranch: 'main',
       createdAt: new Date(),
@@ -92,6 +96,10 @@ export class TestEnvironment {
       },
       commitsAhead: 0,
       commitsBehind: 0,
+      mode,
+      trackingBranch: mode !== 'branched' ? 'main' : undefined,
+      claimedAt: mode === 'claimed' ? new Date() : undefined,
+      baseCommit: mode !== 'branched' ? 'abc1234567890' : undefined,
     };
   }
 
