@@ -64,7 +64,8 @@ All TypeScript interfaces are defined in `src/core/types.ts`. Key types include:
 |-----------|---------|
 | `WKTDatabase` | Root database structure with projects, workspaces, and metadata |
 | `Project` | Repository metadata (name, paths, default branch) |
-| `Workspace` | Worktree metadata (branch, path, status, timestamps) |
+| `Workspace` | Worktree metadata (branch, path, status, mode, timestamps) |
+| `WorkspaceMode` | Workspace type: `branched`, `claimed`, or `pooled` |
 | `WorkspaceStatus` | Git status counts (staged, unstaged, untracked, conflicted) |
 | `GlobalConfig` | Full configuration structure |
 | `ProjectConfig` | Project-specific configuration overrides |
@@ -89,15 +90,21 @@ Key methods:
 Schema versioning and migration system for database upgrades:
 
 ```typescript
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const migrations: Migration[] = [
-  // Future migrations go here
-  // {
-  //   version: 2,
-  //   description: 'Add tags to workspaces',
-  //   migrate: (db) => { ... }
-  // }
+  {
+    version: 2,
+    description: 'Add mode field to workspaces',
+    migrate: (db) => {
+      for (const workspace of Object.values(db.workspaces)) {
+        if (!workspace.mode) {
+          workspace.mode = 'branched';
+        }
+      }
+      return db;
+    }
+  }
 ];
 ```
 

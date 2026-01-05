@@ -1,3 +1,5 @@
+export type WorkspaceMode = 'branched' | 'claimed' | 'pooled';
+
 export interface Project {
   name: string;
   repositoryUrl: string;
@@ -22,6 +24,10 @@ export interface Workspace {
   commitsAhead?: number;
   commitsBehind?: number;
   description?: string;
+  mode: WorkspaceMode;
+  trackingBranch?: string;  // For claimed/pooled workspaces
+  claimedAt?: Date;         // When workspace was claimed from pool
+  baseCommit?: string;      // Commit SHA at claim/release time
 }
 
 export interface WorkspaceStatus {
@@ -43,6 +49,10 @@ export interface ProjectConfig {
     naming_strategy?: 'sanitized' | 'kebab-case' | 'snake_case';
     auto_cleanup?: boolean;
     max_age_days?: number;
+    pool?: {
+      max_size?: number;       // Max pooled workspaces per project (default: 5)
+      max_age_days?: number;   // Auto-clean old pooled workspaces (default: 30)
+    };
   };
   inference?: {
     patterns?: InferencePattern[];
@@ -148,6 +158,7 @@ export interface ListCommandOptions {
   all?: boolean;
   dirty?: boolean;
   stale?: string;
+  pool?: boolean;
 }
 
 export interface CleanCommandOptions extends BaseCommandOptions {
@@ -155,6 +166,7 @@ export interface CleanCommandOptions extends BaseCommandOptions {
   all?: boolean;
   merged?: boolean;
   olderThan?: string;
+  includePool?: boolean;  // Include pooled workspaces in cleanup
 }
 
 export interface ConfigCommandOptions {
@@ -185,6 +197,19 @@ export interface RenameCommandOptions extends BaseCommandOptions {
   name?: string;
   rebase?: boolean;
   description?: string;
+}
+
+export interface ClaimCommandOptions extends BaseCommandOptions {
+  from?: string;  // Tracking branch (default: project's defaultBranch)
+}
+
+// ReleaseCommandOptions uses force from BaseCommandOptions
+export type ReleaseCommandOptions = BaseCommandOptions;
+
+export interface SaveCommandOptions extends BaseCommandOptions {
+  branch?: string;
+  stash?: boolean;
+  discard?: boolean;
 }
 
 // Safe script execution types
@@ -231,6 +256,8 @@ export interface ScriptConfig {
     post_switch?: ScriptHook[];
     pre_clean?: ScriptHook[];
     post_clean?: ScriptHook[];
+    post_claim?: ScriptHook[];    // After claiming from pool
+    post_release?: ScriptHook[];  // After releasing to pool
   };
   
   // Named script shortcuts
@@ -243,6 +270,8 @@ export interface ScriptConfig {
     post_switch?: ScriptHook[];
     pre_clean?: ScriptHook[];
     post_clean?: ScriptHook[];
+    post_claim?: ScriptHook[];
+    post_release?: ScriptHook[];
     scripts?: Record<string, ScriptDefinition>;
   }>;
 }

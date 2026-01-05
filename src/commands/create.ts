@@ -112,6 +112,7 @@ export async function createCommand(
       commitsAhead: commitsDiff.ahead,
       commitsBehind: commitsDiff.behind,
       description: options.description,
+      mode: 'branched',
     };
 
     dbManager.addWorkspace(workspace);

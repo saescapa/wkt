@@ -211,6 +211,7 @@ export async function initCommand(
       status,
       commitsAhead: 0,
       commitsBehind: 0,
+      mode: 'branched',
     };
 
     dbManager.addWorkspace(workspace);

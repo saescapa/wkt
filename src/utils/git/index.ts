@@ -9,7 +9,15 @@ export {
   isBranchMerged,
   getBranchAge,
 } from './branches.js';
-export { createWorktree, removeWorktree, moveWorktree, listWorktrees } from './worktrees.js';
+export {
+  createWorktree,
+  removeWorktree,
+  moveWorktree,
+  listWorktrees,
+  createDetachedWorktree,
+  resetDetachedWorktree,
+  createBranchFromDetached,
+} from './worktrees.js';
 export {
   getWorkspaceStatus,
   isWorkingTreeClean,

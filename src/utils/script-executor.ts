@@ -215,6 +215,62 @@ export class SafeScriptExecutor {
   }
 
   /**
+   * Execute post-claim hooks (runs after workspace is claimed from pool)
+   */
+  static async executePostClaimHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: RunCommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('post_claim', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🔧 Running post-claim scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed. Workspace claimed but setup incomplete.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute post-release hooks (runs after workspace is released to pool)
+   */
+  static async executePostReleaseHooks(
+    context: ExecutionContext,
+    scriptConfig: ScriptConfig,
+    options: RunCommandOptions = {}
+  ): Promise<void> {
+    const hooks = this.getApplicableHooks('post_release', context, scriptConfig);
+
+    if (hooks.length === 0) {
+      return;
+    }
+
+    console.log(chalk.blue('\n🧹 Running post-release scripts...'));
+
+    for (const hook of hooks) {
+      const success = await this.executeHook(hook, context, scriptConfig, options);
+      if (!success) {
+        const script = this.findScript(hook.script, context.workspace, scriptConfig);
+        if (!script?.optional) {
+          console.error(chalk.red(`Required script "${hook.script}" failed.`));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
    * Execute a script hook
    */
   private static async executeHook(
@@ -287,7 +343,7 @@ export class SafeScriptExecutor {
    * Get applicable hooks for a workspace
    */
   private static getApplicableHooks(
-    hookType: 'post_create' | 'pre_switch' | 'post_switch' | 'pre_clean' | 'post_clean',
+    hookType: 'post_create' | 'pre_switch' | 'post_switch' | 'pre_clean' | 'post_clean' | 'post_claim' | 'post_release',
     context: ExecutionContext,
     scriptConfig: ScriptConfig
   ): ScriptHook[] {

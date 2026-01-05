@@ -1,5 +1,5 @@
 import { executeCommand } from './command.js';
-import { branchExists, getLatestBranchReference } from './branches.js';
+import { branchExists, getLatestBranchReference, getCurrentBranch } from './branches.js';
 import { logger } from '../logger.js';
 
 export async function createWorktree(
@@ -127,4 +127,89 @@ export async function listWorktrees(bareRepoPath: string): Promise<Array<{ path:
     logger.debug(`Failed to list worktrees: ${error instanceof Error ? error.message : String(error)}`);
     return [];
   }
+}
+
+/**
+ * Create a detached worktree at a specific commit (for pool workspaces)
+ * Returns the commit SHA
+ */
+export async function createDetachedWorktree(
+  bareRepoPath: string,
+  workspacePath: string,
+  trackingBranch: string
+): Promise<string> {
+  // Get the latest reference for the tracking branch
+  const branchRef = await getLatestBranchReference(bareRepoPath, trackingBranch);
+
+  // Create worktree in detached HEAD state at the commit
+  // --detach flag creates worktree at commit without creating a branch
+  await executeCommand(['git', 'worktree', 'add', '--detach', workspacePath, branchRef], bareRepoPath);
+
+  // Get the commit SHA we ended up at
+  const commitSHA = await executeCommand(['git', 'rev-parse', 'HEAD'], workspacePath);
+
+  // Ensure origin remote is properly configured in the worktree
+  try {
+    const originUrl = await executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
+
+    try {
+      await executeCommand(['git', 'remote', 'get-url', 'origin'], workspacePath);
+      await executeCommand(['git', 'remote', 'set-url', 'origin', originUrl], workspacePath);
+    } catch {
+      logger.debug('Adding origin remote to worktree');
+      await executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
+    }
+  } catch (error) {
+    logger.warn(`Could not configure origin remote in worktree: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return commitSHA;
+}
+
+/**
+ * Reset a detached worktree to the latest commit of a tracking branch
+ * Returns the new commit SHA
+ */
+export async function resetDetachedWorktree(
+  bareRepoPath: string,
+  workspacePath: string,
+  trackingBranch: string
+): Promise<string> {
+  // Fetch to ensure we have the latest
+  try {
+    await executeCommand(['git', 'fetch', 'origin'], workspacePath);
+  } catch (error) {
+    logger.debug(`Fetch failed, continuing with local refs: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // Get the latest reference for the tracking branch
+  const branchRef = await getLatestBranchReference(bareRepoPath, trackingBranch);
+
+  // Hard reset to the latest commit
+  await executeCommand(['git', 'reset', '--hard', branchRef], workspacePath);
+
+  // Clean any untracked files
+  await executeCommand(['git', 'clean', '-fd'], workspacePath);
+
+  // Get the commit SHA we ended up at
+  const commitSHA = await executeCommand(['git', 'rev-parse', 'HEAD'], workspacePath);
+
+  return commitSHA;
+}
+
+/**
+ * Create a branch from the current detached HEAD state
+ */
+export async function createBranchFromDetached(
+  workspacePath: string,
+  branchName: string
+): Promise<void> {
+  // Verify we're in detached HEAD state
+  const currentBranch = await getCurrentBranch(workspacePath);
+  if (currentBranch !== 'HEAD') {
+    throw new Error(`Workspace is not in detached HEAD state (currently on branch '${currentBranch}')`);
+  }
+
+  // Create and checkout the new branch from current HEAD
+  await executeCommand(['git', 'checkout', '-b', branchName], workspacePath);
 }

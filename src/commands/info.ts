@@ -1,8 +1,22 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import type { WorkspaceMode } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ErrorHandler } from '../utils/errors.js';
 import { formatTimeAgo } from '../utils/format.js';
+
+function getModeDisplay(mode: WorkspaceMode): string {
+  switch (mode) {
+    case 'branched':
+      return chalk.blue('branched');
+    case 'claimed':
+      return chalk.cyan('claimed');
+    case 'pooled':
+      return chalk.gray('pooled');
+    default:
+      return mode;
+  }
+}
 
 interface InfoCommandOptions {
   descriptionOnly?: boolean;
@@ -91,6 +105,10 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
         status: workspace.status,
         commitsAhead: workspace.commitsAhead,
         commitsBehind: workspace.commitsBehind,
+        mode: workspace.mode,
+        trackingBranch: workspace.trackingBranch,
+        baseCommit: workspace.baseCommit,
+        claimedAt: workspace.claimedAt,
       }, null, 2));
       return;
     }
@@ -103,8 +121,25 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
     console.log();
 
     console.log(`${chalk.gray('Project:')}      ${workspace.projectName}`);
-    console.log(`${chalk.gray('Branch:')}       ${chalk.cyan(workspace.branchName)}`);
-    console.log(`${chalk.gray('Base:')}         ${workspace.baseBranch}`);
+    console.log(`${chalk.gray('Mode:')}         ${getModeDisplay(workspace.mode)}`);
+
+    // Mode-specific fields
+    if (workspace.mode === 'branched') {
+      console.log(`${chalk.gray('Branch:')}       ${chalk.cyan(workspace.branchName)}`);
+      console.log(`${chalk.gray('Base:')}         ${workspace.baseBranch}`);
+    } else if (workspace.mode === 'claimed') {
+      console.log(`${chalk.gray('Tracking:')}     ${chalk.cyan(workspace.trackingBranch || workspace.baseBranch)}`);
+      if (workspace.baseCommit) {
+        console.log(`${chalk.gray('Base commit:')}  ${workspace.baseCommit.substring(0, 7)}`);
+      }
+      if (workspace.claimedAt) {
+        console.log(`${chalk.gray('Claimed:')}      ${formatTimeAgo(workspace.claimedAt)}`);
+      }
+    } else if (workspace.mode === 'pooled') {
+      console.log(`${chalk.gray('Tracking:')}     ${chalk.cyan(workspace.trackingBranch || workspace.baseBranch)}`);
+      console.log(`${chalk.gray('Last used:')}    ${formatTimeAgo(workspace.lastUsed)}`);
+    }
+
     console.log(`${chalk.gray('Path:')}         ${workspace.path}`);
 
     // Status

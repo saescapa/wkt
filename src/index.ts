@@ -12,6 +12,9 @@ import { syncCommand } from './commands/sync.js';
 import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { infoCommand } from './commands/info.js';
+import { claimCommand } from './commands/claim.js';
+import { releaseCommand } from './commands/release.js';
+import { saveCommand } from './commands/save.js';
 import { Logger, logger } from './utils/logger.js';
 import { ErrorHandler } from './utils/errors.js';
 
@@ -104,6 +107,7 @@ program
   .option('--filter <pattern>', 'Filter by pattern')
   .option('--dirty', 'Show only workspaces with uncommitted changes')
   .option('--stale <duration>', 'Show only workspaces older than duration (e.g., 30d, 2w)')
+  .option('--pool', 'Show only pooled and claimed workspaces')
   .option('--group-by <field>', 'Group results by field', 'project')
   .option('-a, --all', 'Show all workspaces including inactive main branches')
   .action(listCommand);
@@ -115,9 +119,34 @@ program
   .option('-p, --project <name>', 'Clean specific project')
   .option('--merged', 'Remove merged workspaces (default behavior)')
   .option('--older-than <duration>', 'Remove workspaces older than duration (e.g., 30d, 2w, 6m, 1y)')
+  .option('--include-pool', 'Include pooled workspaces in cleanup')
   .option('--force', 'Force removal without confirmation')
   .option('--all', 'Clean all workspaces (overrides --merged default)')
   .action(cleanCommand);
+
+// Pool Commands
+program.commandsGroup('Pool:');
+
+program
+  .command('claim')
+  .description('Claim a workspace from the pool')
+  .argument('[project]', 'Project name (interactive if omitted)')
+  .option('--from <branch>', 'Track a specific branch (default: project\'s default branch)')
+  .action(claimCommand);
+
+program
+  .command('release')
+  .description('Release workspace back to pool')
+  .option('--force', 'Force release with uncommitted changes')
+  .action(releaseCommand);
+
+program
+  .command('save')
+  .description('Save changes from claimed workspace')
+  .option('--branch <name>', 'Create a branch from changes')
+  .option('--stash', 'Stash changes')
+  .option('--discard', 'Discard changes')
+  .action(saveCommand);
 
 program
   .command('rename')

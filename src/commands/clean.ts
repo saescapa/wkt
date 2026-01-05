@@ -231,6 +231,32 @@ async function shouldCleanWorkspace(
     };
   }
 
+  // Skip pooled workspaces unless --include-pool is set
+  if (workspace.mode === 'pooled' && !options.includePool) {
+    return {
+      clean: false,
+      reason: `Pooled workspace (use --include-pool to remove)`,
+      canForce: false
+    };
+  }
+
+  // Warn about claimed workspaces with uncommitted changes
+  if (workspace.mode === 'claimed') {
+    if (!workspace.status.clean) {
+      return {
+        clean: false,
+        reason: `Claimed workspace has uncommitted changes (use 'wkt release' or 'wkt save' first)`,
+        canForce: true
+      };
+    }
+    // Even clean claimed workspaces should be released first
+    return {
+      clean: false,
+      reason: `Claimed workspace (use 'wkt release' to return to pool first)`,
+      canForce: true
+    };
+  }
+
   // Check if we should only clean merged branches
   if (options.merged) {
     try {

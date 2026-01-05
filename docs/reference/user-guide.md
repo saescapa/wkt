@@ -205,8 +205,26 @@ wkt list --all
 - `--filter <pattern>` - Filter by pattern
 - `--dirty` - Show only workspaces with uncommitted changes
 - `--stale <duration>` - Show workspaces older than duration
+- `--pool` - Show only pooled and claimed workspaces
 - `--group-by <field>` - Group results (default: project)
 - `-a, --all` - Include inactive main branches
+
+**Output Format:**
+
+```
+myproject/
+  main:
+    ├─ ● main                  active - just now
+    ├─ ○ feat-auth             branched - 3d ago
+    └─ ◇ wksp-1                claimed - 2h ago
+```
+
+**Icons:**
+- `●` Active workspace (current)
+- `○` Branched workspace
+- `◇` Claimed or pooled workspace
+- `◐` Has uncommitted changes (overrides mode icon)
+- `✗` Has conflicts (overrides mode icon)
 
 **Duration Format:**
 

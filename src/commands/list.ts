@@ -73,6 +73,16 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
+  // Filter by pool (claimed or pooled workspaces)
+  if (options.pool) {
+    workspaces = workspaces.filter(w => w.mode === 'claimed' || w.mode === 'pooled');
+
+    if (workspaces.length === 0) {
+      console.log(chalk.yellow('No pooled or claimed workspaces.'));
+      return;
+    }
+  }
+
   const currentWorkspace = dbManager.getCurrentWorkspace();
 
   // Separate active vs inactive workspaces
@@ -136,33 +146,66 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     console.log(chalk.dim.bold('Inactive:'));
     displayInactiveWorkspaces(inactiveWorkspaces, options.details);
   }
+
+  // Show pool summary when using --pool flag
+  if (options.pool) {
+    const pooledCount = workspaces.filter(w => w.mode === 'pooled').length;
+    console.log(chalk.dim('─'.repeat(40)));
+    console.log(chalk.gray(`(${pooledCount} available in pool)`));
+  }
 }
 
 function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
   const projectGroups = groupWorkspacesByProject(workspaces);
 
   Object.entries(projectGroups).forEach(([projectName, projectWorkspaces]) => {
-    console.log(chalk.bold(`${projectName}:`));
-    
-    projectWorkspaces.forEach(workspace => {
-      const isCurrent = currentWorkspace?.id === workspace.id;
-      const prefix = isCurrent ? chalk.green('  * ') : '    ';
-      
-      console.log(formatWorkspace(workspace, prefix, showDetails));
+    console.log(chalk.bold(`${projectName}/`));
+
+    const branchGroups = groupByTrackingBranch(projectWorkspaces);
+
+    Object.entries(branchGroups).forEach(([branchName, branchWorkspaces]) => {
+      console.log(chalk.dim(`  ${branchName}:`));
+
+      branchWorkspaces.forEach((workspace, index) => {
+        const isLast = index === branchWorkspaces.length - 1;
+        const connector = isLast ? '└─' : '├─';
+        const isCurrent = currentWorkspace?.id === workspace.id;
+
+        console.log(formatWorkspace(workspace, `    ${connector} `, isCurrent, showDetails));
+      });
     });
-    
+
     console.log();
   });
+}
+
+function groupByTrackingBranch(workspaces: Workspace[]): Record<string, Workspace[]> {
+  const groups: Record<string, Workspace[]> = {};
+
+  for (const ws of workspaces) {
+    const trackingBranch = ws.trackingBranch ?? ws.baseBranch;
+    if (!groups[trackingBranch]) {
+      groups[trackingBranch] = [];
+    }
+    groups[trackingBranch]!.push(ws);
+  }
+
+  for (const group of Object.values(groups)) {
+    group.sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime());
+  }
+
+  return groups;
 }
 
 function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
   workspaces
     .sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime())
-    .forEach(workspace => {
+    .forEach((workspace, index) => {
+      const isLast = index === workspaces.length - 1;
+      const connector = isLast ? '└─' : '├─';
       const isCurrent = currentWorkspace?.id === workspace.id;
-      const prefix = isCurrent ? chalk.green('* ') : '  ';
 
-      console.log(formatWorkspace(workspace, prefix, showDetails, true));
+      console.log(formatWorkspace(workspace, `${connector} `, isCurrent, showDetails, true));
     });
 }
 
@@ -183,8 +226,9 @@ function displayInactiveWorkspaces(workspaces: Workspace[], showDetails?: boolea
   });
 }
 
-function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boolean, includeProject?: boolean): string {
-  const statusIcon = getStatusIcon(workspace);
+function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolean, showDetails?: boolean, includeProject?: boolean): string {
+  const modeIcon = getModeIcon(workspace, isCurrent);
+  const dirtyIndicator = getDirtyIndicator(workspace);
   const statusText = getStatusText(workspace);
   const timeAgo = formatTimeAgo(workspace.lastUsed);
 
@@ -193,7 +237,8 @@ function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boo
     name = `${workspace.projectName}/${workspace.name}`;
   }
 
-  let line = `${prefix}${statusIcon} ${chalk.bold(name)}`;
+  const icon = dirtyIndicator || modeIcon;
+  let line = `${prefix}${icon} ${chalk.bold(name)}`;
 
   if (showDetails) {
     if (workspace.description) {
@@ -201,6 +246,10 @@ function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boo
     }
     line += `\n${prefix}    Branch: ${chalk.cyan(workspace.branchName)}`;
     line += `\n${prefix}    Base: ${chalk.gray(workspace.baseBranch)}`;
+    if (workspace.trackingBranch) {
+      line += `\n${prefix}    Tracking: ${chalk.gray(workspace.trackingBranch)}`;
+    }
+    line += `\n${prefix}    Mode: ${chalk.gray(workspace.mode)}`;
     line += `\n${prefix}    Path: ${chalk.gray(workspace.path)}`;
     line += `\n${prefix}    Status: ${statusText}`;
     line += `\n${prefix}    Created: ${chalk.gray(workspace.createdAt.toLocaleDateString())}`;
@@ -214,15 +263,48 @@ function formatWorkspace(workspace: Workspace, prefix: string, showDetails?: boo
       if (behind > 0) line += chalk.red(`-${behind}`);
     }
   } else {
-    line += ` ${chalk.gray(`(${workspace.branchName})`)}`;
+    const modeLabel = getModeLabel(workspace, isCurrent);
+    line += ` ${chalk.gray(modeLabel)}`;
     if (workspace.description) {
       line += ` ${chalk.dim(`- ${workspace.description}`)}`;
     }
-    line += ` ${statusText}`;
+    if (!workspace.status.clean) {
+      line += ` ${statusText}`;
+    }
     line += ` ${chalk.gray(`- ${timeAgo}`)}`;
   }
 
   return line;
+}
+
+function getModeIcon(workspace: Workspace, isCurrent: boolean): string {
+  if (isCurrent) {
+    return chalk.green('●');
+  }
+  switch (workspace.mode) {
+    case 'claimed':
+    case 'pooled':
+      return chalk.cyan('◇');
+    case 'branched':
+    default:
+      return chalk.blue('○');
+  }
+}
+
+function getModeLabel(workspace: Workspace, isCurrent: boolean): string {
+  if (isCurrent) {
+    return 'active';
+  }
+  return workspace.mode;
+}
+
+function getDirtyIndicator(workspace: Workspace): string | null {
+  if (workspace.status.conflicted > 0) {
+    return chalk.red('✗');
+  } else if (!workspace.status.clean) {
+    return chalk.yellow('◐');
+  }
+  return null;
 }
 
 function groupWorkspacesByProject(workspaces: Workspace[]): Record<string, Workspace[]> {
@@ -248,15 +330,6 @@ function groupWorkspacesByProject(workspaces: Workspace[]): Record<string, Works
   return groups;
 }
 
-function getStatusIcon(workspace: Workspace): string {
-  if (workspace.status.conflicted > 0) {
-    return chalk.red('✗');
-  } else if (!workspace.status.clean) {
-    return chalk.yellow('◐');
-  } else {
-    return chalk.green('●');
-  }
-}
 
 function getStatusText(workspace: Workspace): string {
   if (workspace.status.clean) {
