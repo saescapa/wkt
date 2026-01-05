@@ -121,8 +121,6 @@ export async function claimCommand(
       console.log(chalk.green(`✓ Created '${workspaceName}' (tracking ${trackingBranch})`));
     }
 
-    dbManager.setCurrentWorkspace(workspace.id);
-
     // Setup local files (symlinks and copies)
     await localFilesManager.setupLocalFiles(project, workspace.path, projectConfig, config, {
       name: workspace.name,

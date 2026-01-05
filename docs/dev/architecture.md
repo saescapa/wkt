@@ -83,7 +83,7 @@ Key methods:
 - `addProject()` / `getProject()` / `getAllProjects()` — Project CRUD
 - `addWorkspace()` / `getWorkspace()` / `getAllWorkspaces()` — Workspace CRUD
 - `getWorkspaceFromPath()` — Detect workspace from current directory
-- `getCurrentWorkspaceContext()` — Get active workspace (path-based or stored)
+- `getCurrentWorkspaceContext()` — Get workspace from current directory (calls `getWorkspaceFromPath`)
 
 ### Database Migrations (`src/core/migrations.ts`)
 

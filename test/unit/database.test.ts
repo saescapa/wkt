@@ -282,38 +282,4 @@ describe('DatabaseManager', () => {
       expect(project2Pooled[0].name).toBe('wksp-2');
     });
   });
-
-  describe('current workspace management', () => {
-    let testWorkspace: Workspace;
-
-    beforeEach(() => {
-      const testProject = testEnv.createMockProject('test-project');
-      testWorkspace = testEnv.createMockWorkspace('test-project', 'test-workspace');
-      
-      dbManager.addProject(testProject);
-      dbManager.addWorkspace(testWorkspace);
-    });
-
-    it('should set and get current workspace', () => {
-      expect(dbManager.getCurrentWorkspace()).toBeUndefined();
-      
-      dbManager.setCurrentWorkspace(testWorkspace.id);
-      
-      const current = dbManager.getCurrentWorkspace();
-      expect(current?.id).toBe(testWorkspace.id);
-    });
-
-    it('should clear current workspace', () => {
-      dbManager.setCurrentWorkspace(testWorkspace.id);
-      expect(dbManager.getCurrentWorkspace()).toBeDefined();
-      
-      dbManager.setCurrentWorkspace(undefined);
-      expect(dbManager.getCurrentWorkspace()).toBeUndefined();
-    });
-
-    it('should handle non-existent current workspace', () => {
-      dbManager.setCurrentWorkspace('non-existent-id');
-      expect(dbManager.getCurrentWorkspace()).toBeUndefined();
-    });
-  });
 });

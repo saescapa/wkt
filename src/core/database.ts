@@ -155,18 +155,6 @@ export class DatabaseManager {
     this.saveDatabase();
   }
 
-  setCurrentWorkspace(workspaceId: string | undefined): void {
-    const db = this.getDatabase();
-    db.metadata.currentWorkspace = workspaceId;
-    this.saveDatabase();
-  }
-
-  getCurrentWorkspace(): Workspace | undefined {
-    const db = this.getDatabase();
-    const currentId = db.metadata.currentWorkspace;
-    return currentId ? db.workspaces[currentId] : undefined;
-  }
-
   searchWorkspaces(query: string, projectName?: string): Workspace[] {
     const workspaces = projectName
       ? this.getWorkspacesByProject(projectName)
@@ -190,14 +178,7 @@ export class DatabaseManager {
   }
 
   getCurrentWorkspaceContext(): Workspace | undefined {
-    // First try to detect from current directory
-    const pathBasedWorkspace = this.getWorkspaceFromPath();
-    if (pathBasedWorkspace) {
-      return pathBasedWorkspace;
-    }
-
-    // Fall back to stored current workspace
-    return this.getCurrentWorkspace();
+    return this.getWorkspaceFromPath();
   }
 
   getPooledWorkspaces(projectName: string): Workspace[] {

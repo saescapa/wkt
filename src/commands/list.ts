@@ -83,7 +83,7 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
-  const currentWorkspace = dbManager.getCurrentWorkspace();
+  const currentWorkspace = dbManager.getCurrentWorkspaceContext();
 
   // Separate active vs inactive workspaces
   let activeWorkspaces = workspaces;
