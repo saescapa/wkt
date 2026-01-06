@@ -65,7 +65,18 @@ No code change is complete without corresponding test coverage.
 **Setup:**
 ```bash
 bun install
-bun run dev         # Run from source
+bun run dev         # Run from source (uses real ~/.wkt)
+bun run dev:safe    # Run in isolated temp directory (safe for testing)
+```
+
+The `dev:safe` script sets `WKT_HOME` to a temporary directory, preventing accidental modifications to your production `~/.wkt` data during development.
+
+**Environment Isolation:**
+```bash
+# Use a custom WKT directory (useful for testing)
+WKT_HOME=/tmp/wkt-test bun run dev list
+
+# Tests automatically use isolated directories via WKT_HOME
 ```
 
 **Before committing:**

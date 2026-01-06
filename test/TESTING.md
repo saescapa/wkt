@@ -57,6 +57,24 @@ Test the actual CLI binary with real git operations:
 
 E2E tests create temporary git repositories in `/tmp` and run the built CLI against them.
 
+## Test Isolation
+
+All tests run in complete isolation from production data using the `WKT_HOME` environment variable:
+
+```typescript
+// Unit tests use TestEnvironment helper
+const testEnv = new TestEnvironment();
+testEnv.setup();
+mockEnvironmentVariables({ WKT_HOME: testEnv.wktHome });
+
+// E2E tests pass WKT_HOME to CLI process
+async function wkt(args: string[], wktHome: string) {
+  return runCommand('node', [wktBinary, ...args], { env: { WKT_HOME: wktHome } });
+}
+```
+
+This ensures tests never touch `~/.wkt` and each test run gets a fresh, isolated environment.
+
 ## Test Coverage
 
 ### Well Covered
