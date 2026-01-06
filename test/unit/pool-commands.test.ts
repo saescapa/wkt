@@ -13,7 +13,7 @@ describe('Pool Commands - Database Operations', () => {
     testEnv = new TestEnvironment();
     testEnv.setup();
 
-    restoreEnv = mockEnvironmentVariables({ HOME: testEnv.testDir });
+    restoreEnv = mockEnvironmentVariables({ WKT_HOME: testEnv.wktHome });
 
     dbManager = new DatabaseManager();
     testProject = testEnv.createMockProject('test-project');

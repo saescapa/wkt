@@ -5,20 +5,20 @@ import type { GlobalConfig, Project, Workspace, WorkspaceMode } from '../../src/
 
 export class TestEnvironment {
   public testDir: string;
-  public configDir: string;
+  public wktHome: string;
   public workspacesDir: string;
   public projectsDir: string;
 
   constructor() {
     this.testDir = join(tmpdir(), `wkt-test-${Date.now()}-${Math.random().toString(36).substring(7)}`);
-    this.configDir = join(this.testDir, '.wkt');
-    this.workspacesDir = join(this.configDir, 'workspaces');
-    this.projectsDir = join(this.configDir, 'projects');
+    this.wktHome = join(this.testDir, '.wkt');
+    this.workspacesDir = join(this.wktHome, 'workspaces');
+    this.projectsDir = join(this.wktHome, 'projects');
   }
 
   setup(): void {
     mkdirSync(this.testDir, { recursive: true });
-    mkdirSync(this.configDir, { recursive: true });
+    mkdirSync(this.wktHome, { recursive: true });
     mkdirSync(this.workspacesDir, { recursive: true });
     mkdirSync(this.projectsDir, { recursive: true });
   }

@@ -13,8 +13,8 @@ describe('ConfigManager', () => {
     testEnv = new TestEnvironment();
     testEnv.setup();
     
-    // Mock HOME directory to use test directory
-    restoreEnv = mockEnvironmentVariables({ HOME: testEnv.testDir });
+    // Use WKT_HOME for complete isolation
+    restoreEnv = mockEnvironmentVariables({ WKT_HOME: testEnv.wktHome });
     
     configManager = new ConfigManager();
   });
@@ -36,7 +36,7 @@ describe('ConfigManager', () => {
     });
 
     it('should merge custom config with defaults', () => {
-      const configPath = join(testEnv.configDir, 'config.yaml');
+      const configPath = join(testEnv.wktHome, 'config.yaml');
       const customConfig = `
 wkt:
   default_project: "my-project"
@@ -60,7 +60,7 @@ projects:
     });
 
     it('should handle malformed config file gracefully', () => {
-      const configPath = join(testEnv.configDir, 'config.yaml');
+      const configPath = join(testEnv.wktHome, 'config.yaml');
       writeFileSync(configPath, 'invalid: yaml: content: [');
       
       const config = configManager.getConfig();
@@ -77,7 +77,7 @@ projects:
       
       configManager.saveConfig();
       
-      const configPath = join(testEnv.configDir, 'config.yaml');
+      const configPath = join(testEnv.wktHome, 'config.yaml');
       expect(existsSync(configPath)).toBe(true);
       
       // Reload and verify
