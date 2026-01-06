@@ -397,8 +397,26 @@ projects:
 
 | Variable | Description |
 |----------|-------------|
-| `WKT_HOME` | Override WKT home directory (default: `~/.wkt`) |
+| `WKT_HOME` | Override WKT base directory (default: `~/.wkt`) |
 | `WKT_DEBUG` | Enable debug logging |
+
+### WKT_HOME
+
+Override the base directory where WKT stores its configuration, database, and workspaces. Useful for:
+
+- **Development/testing** - Avoid modifying production data
+- **CI environments** - Use isolated directories per job
+- **Multiple configurations** - Run separate WKT instances
+
+```bash
+# Use a custom directory
+WKT_HOME=/tmp/wkt-test wkt list
+
+# Development with isolation (recommended)
+bun run dev:safe    # Automatically uses temp directory
+```
+
+**Priority:** `WKT_HOME` > `HOME/.wkt` > `os.homedir()/.wkt`
 
 ---
 
