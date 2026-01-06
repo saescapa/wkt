@@ -78,16 +78,18 @@ describe('WKT CLI', () => {
     }
   });
 
-  async function wkt(args: string[], homeDir: string): Promise<CommandResult> {
-    return runCommand('node', [wktBinary, ...args], { env: { HOME: homeDir } });
+  async function wkt(args: string[], wktHome: string): Promise<CommandResult> {
+    return runCommand('node', [wktBinary, ...args], { env: { WKT_HOME: wktHome } });
   }
 
   describe('Basic Commands', () => {
     let testDir: string;
+    let wktHome: string;
 
     beforeEach(() => {
       testDir = join(tmpdir(), `wkt-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      mkdirSync(testDir, { recursive: true });
+      wktHome = join(testDir, '.wkt');
+      mkdirSync(wktHome, { recursive: true });
     });
 
     afterAll(() => {
@@ -101,7 +103,7 @@ describe('WKT CLI', () => {
     });
 
     it('should show help when no arguments provided', async () => {
-      const result = await wkt([], testDir);
+      const result = await wkt([], wktHome);
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toContain('Usage: wkt');
@@ -109,35 +111,35 @@ describe('WKT CLI', () => {
     });
 
     it('should handle --version flag', async () => {
-      const result = await wkt(['--version'], testDir);
+      const result = await wkt(['--version'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('0.1.0');
     });
 
     it('should show no projects when listing initially', async () => {
-      const result = await wkt(['init', '--list'], testDir);
+      const result = await wkt(['init', '--list'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('No projects initialized yet');
     });
 
     it('should show empty workspace list initially', async () => {
-      const result = await wkt(['list'], testDir);
+      const result = await wkt(['list'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('No workspaces found');
     });
 
     it('should error on non-existent project', async () => {
-      const result = await wkt(['create', 'fake-project', 'feature/test'], testDir);
+      const result = await wkt(['create', 'fake-project', 'feature/test'], wktHome);
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("Project 'fake-project' not found");
     });
 
     it('should error on non-existent workspace switch', async () => {
-      const result = await wkt(['switch', 'fake-workspace'], testDir);
+      const result = await wkt(['switch', 'fake-workspace'], wktHome);
 
       expect(result.exitCode).toBe(1);
       // When no workspaces exist, we get "No workspace detected" instead of "not found"
@@ -204,13 +206,15 @@ describe('WKT CLI', () => {
 
   describe('Full Workflow', () => {
     let testDir: string;
+    let wktHome: string;
     let sourceRepo: string;
 
     beforeAll(() => {
       testDir = join(tmpdir(), `wkt-workflow-${Date.now()}`);
+      wktHome = join(testDir, '.wkt');
       sourceRepo = join(testDir, 'source-repo');
 
-      mkdirSync(testDir, { recursive: true });
+      mkdirSync(wktHome, { recursive: true });
       createTestGitRepo(sourceRepo);
     });
 
@@ -221,7 +225,7 @@ describe('WKT CLI', () => {
     });
 
     it('should initialize project from local repo', async () => {
-      const result = await wkt(['init', sourceRepo, 'test-project'], testDir);
+      const result = await wkt(['init', sourceRepo, 'test-project'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Successfully initialized');
@@ -229,14 +233,14 @@ describe('WKT CLI', () => {
     });
 
     it('should list the initialized project', async () => {
-      const result = await wkt(['init', '--list'], testDir);
+      const result = await wkt(['init', '--list'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('test-project');
     });
 
     it('should create a workspace', async () => {
-      const result = await wkt(['create', 'test-project', 'feature/auth'], testDir);
+      const result = await wkt(['create', 'test-project', 'feature/auth'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Successfully created workspace');
@@ -244,7 +248,7 @@ describe('WKT CLI', () => {
     });
 
     it('should list the created workspace', async () => {
-      const result = await wkt(['list'], testDir);
+      const result = await wkt(['list'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('auth');
@@ -252,23 +256,23 @@ describe('WKT CLI', () => {
 
     it('should show workspace info', async () => {
       // First switch to the workspace to make it current
-      await wkt(['switch', 'auth', '--path-only'], testDir);
+      await wkt(['switch', 'auth', '--path-only'], wktHome);
 
-      const result = await wkt(['info'], testDir);
+      const result = await wkt(['info'], wktHome);
 
       // Info might show current workspace or prompt
       expect(result.exitCode).toBe(0);
     });
 
     it('should create a second workspace', async () => {
-      const result = await wkt(['create', 'test-project', 'feature/payments'], testDir);
+      const result = await wkt(['create', 'test-project', 'feature/payments'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Successfully created workspace');
     });
 
     it('should list both workspaces', async () => {
-      const result = await wkt(['list'], testDir);
+      const result = await wkt(['list'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('auth');
@@ -276,7 +280,7 @@ describe('WKT CLI', () => {
     });
 
     it('should switch workspace with --path-only', async () => {
-      const result = await wkt(['switch', 'auth', '--path-only'], testDir);
+      const result = await wkt(['switch', 'auth', '--path-only'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('test-project');
@@ -284,21 +288,21 @@ describe('WKT CLI', () => {
     });
 
     it('should error on duplicate workspace', async () => {
-      const result = await wkt(['create', 'test-project', 'feature/auth'], testDir);
+      const result = await wkt(['create', 'test-project', 'feature/auth'], wktHome);
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('already exists');
     });
 
     it('should error on duplicate project init', async () => {
-      const result = await wkt(['init', sourceRepo, 'test-project'], testDir);
+      const result = await wkt(['init', sourceRepo, 'test-project'], wktHome);
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('already exists');
     });
 
     it('should filter workspaces by project', async () => {
-      const result = await wkt(['list', '--project', 'test-project'], testDir);
+      const result = await wkt(['list', '--project', 'test-project'], wktHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('auth');
@@ -307,10 +311,10 @@ describe('WKT CLI', () => {
 
     it('should clean up merged workspace', async () => {
       // Create a workspace that we'll "merge" by deleting
-      await wkt(['create', 'test-project', 'feature/temp-branch'], testDir);
+      await wkt(['create', 'test-project', 'feature/temp-branch'], wktHome);
 
       // Clean with the workspace name
-      const result = await wkt(['clean', 'temp-branch', '--force'], testDir);
+      const result = await wkt(['clean', 'temp-branch', '--force'], wktHome);
 
       expect(result.exitCode).toBe(0);
     });

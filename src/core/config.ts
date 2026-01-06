@@ -4,23 +4,35 @@ import { homedir } from 'os';
 import { parse, stringify } from 'yaml';
 import type { GlobalConfig, ProjectConfig } from './types.js';
 
+/**
+ * Get the WKT base directory.
+ * Priority: WKT_HOME > HOME > os.homedir()
+ * WKT_HOME allows complete isolation for development/testing.
+ */
+export function getWKTBaseDir(): string {
+  if (process.env.WKT_HOME) {
+    return process.env.WKT_HOME;
+  }
+  const homeDirectory = process.env.HOME || homedir();
+  return join(homeDirectory, '.wkt');
+}
+
 export class ConfigManager {
   private configDir: string;
   private configPath: string;
   private config: GlobalConfig | null = null;
 
   constructor() {
-    const homeDirectory = process.env.HOME || homedir();
-    this.configDir = join(homeDirectory, '.wkt');
+    this.configDir = getWKTBaseDir();
     this.configPath = join(this.configDir, 'config.yaml');
   }
 
   private getDefaultConfig(): GlobalConfig {
-    const homeDirectory = process.env.HOME || homedir();
+    const baseDir = getWKTBaseDir();
     return {
       wkt: {
-        workspace_root: join(homeDirectory, '.wkt', 'workspaces'),
-        projects_root: join(homeDirectory, '.wkt', 'projects'),
+        workspace_root: join(baseDir, 'workspaces'),
+        projects_root: join(baseDir, 'projects'),
       },
       workspace: {
         naming_strategy: 'sanitized',

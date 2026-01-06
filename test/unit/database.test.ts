@@ -12,7 +12,7 @@ describe('DatabaseManager', () => {
     testEnv = new TestEnvironment();
     testEnv.setup();
     
-    restoreEnv = mockEnvironmentVariables({ HOME: testEnv.testDir });
+    restoreEnv = mockEnvironmentVariables({ WKT_HOME: testEnv.wktHome });
     
     dbManager = new DatabaseManager();
   });
