@@ -140,11 +140,14 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     displayFlat(activeWorkspaces, currentWorkspace, options.details);
   }
 
-  // Show inactive workspaces in separate section
+  // Show inactive workspaces in separate section (compact format)
   if (inactiveWorkspaces.length > 0) {
     console.log(chalk.dim('─'.repeat(40)));
-    console.log(chalk.dim.bold('Inactive:'));
-    displayInactiveWorkspaces(inactiveWorkspaces, options.details);
+    const inactiveList = inactiveWorkspaces.map(w => {
+      const timeAgo = formatTimeAgo(w.lastUsed).replace(' ago', '');
+      return `${w.projectName}/${w.name} (${timeAgo})`;
+    }).join(', ');
+    console.log(chalk.dim(`Inactive: ${inactiveList}`));
   }
 
   // Show pool summary when using --pool flag
@@ -153,6 +156,11 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     console.log(chalk.dim('─'.repeat(40)));
     console.log(chalk.gray(`(${pooledCount} available in pool)`));
   }
+
+  // Show legend
+  console.log();
+  console.log(chalk.dim('─'.repeat(40)));
+  console.log(chalk.dim(`${chalk.green('●')} active  ${chalk.blue('○')} workspace  ${chalk.cyan('◇')} pooled  ${chalk.yellow('◐')} dirty  ${chalk.red('✗')} conflict`));
 }
 
 function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
@@ -179,6 +187,12 @@ function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Wor
   });
 }
 
+// Extract pool number from workspace name (e.g., "main-wksp-3" -> 3, "wksp-1" -> 1)
+function getPoolNumber(name: string): number | null {
+  const match = name.match(/wksp-(\d+)$/);
+  return match && match[1] ? parseInt(match[1], 10) : null;
+}
+
 function groupByTrackingBranch(workspaces: Workspace[]): Record<string, Workspace[]> {
   const groups: Record<string, Workspace[]> = {};
 
@@ -191,7 +205,28 @@ function groupByTrackingBranch(workspaces: Workspace[]): Record<string, Workspac
   }
 
   for (const group of Object.values(groups)) {
-    group.sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime());
+    group.sort((a, b) => {
+      const aPoolNum = getPoolNumber(a.name);
+      const bPoolNum = getPoolNumber(b.name);
+      const aIsPool = aPoolNum !== null;
+      const bIsPool = bPoolNum !== null;
+
+      // Pool workspaces come first
+      if (aIsPool && !bIsPool) return -1;
+      if (!aIsPool && bIsPool) return 1;
+
+      // Both are pool workspaces - sort by number, then by availability
+      if (aIsPool && bIsPool) {
+        // Available (pooled) before in-use (claimed)
+        if (a.mode === 'pooled' && b.mode !== 'pooled') return -1;
+        if (a.mode !== 'pooled' && b.mode === 'pooled') return 1;
+        // Then by number
+        return aPoolNum! - bPoolNum!;
+      }
+
+      // Neither are pool workspaces - sort by lastUsed
+      return b.lastUsed.getTime() - a.lastUsed.getTime();
+    });
   }
 
   return groups;
@@ -207,23 +242,6 @@ function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, show
 
       console.log(formatWorkspace(workspace, `${connector} `, isCurrent, showDetails, true));
     });
-}
-
-function displayInactiveWorkspaces(workspaces: Workspace[], showDetails?: boolean): void {
-  const projectGroups = groupWorkspacesByProject(workspaces);
-
-  Object.entries(projectGroups).forEach(([projectName, projectWorkspaces]) => {
-    console.log(chalk.dim(`  ${projectName}:`));
-
-    projectWorkspaces.forEach(workspace => {
-      const timeAgo = formatTimeAgo(workspace.lastUsed);
-      if (showDetails) {
-        console.log(chalk.dim(`      ${workspace.name} (${workspace.branchName}) - ${timeAgo}`));
-      } else {
-        console.log(chalk.dim(`      ${workspace.name} - ${timeAgo}`));
-      }
-    });
-  });
 }
 
 function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolean, showDetails?: boolean, includeProject?: boolean): string {
@@ -264,7 +282,9 @@ function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolea
     }
   } else {
     const modeLabel = getModeLabel(workspace, isCurrent);
-    line += ` ${chalk.gray(modeLabel)}`;
+    if (modeLabel) {
+      line += ` ${chalk.gray(modeLabel)}`;
+    }
     if (workspace.description) {
       line += ` ${chalk.dim(`- ${workspace.description}`)}`;
     }
@@ -282,9 +302,9 @@ function getModeIcon(workspace: Workspace, isCurrent: boolean): string {
     return chalk.green('●');
   }
   switch (workspace.mode) {
-    case 'claimed':
     case 'pooled':
       return chalk.cyan('◇');
+    case 'claimed':
     case 'branched':
     default:
       return chalk.blue('○');
@@ -295,7 +315,12 @@ function getModeLabel(workspace: Workspace, isCurrent: boolean): string {
   if (isCurrent) {
     return 'active';
   }
-  return workspace.mode;
+  // Only show label for pooled workspaces
+  if (workspace.mode === 'pooled') {
+    return 'pooled';
+  }
+  // Claimed and branched show no label
+  return '';
 }
 
 function getDirtyIndicator(workspace: Workspace): string | null {
