@@ -91,6 +91,47 @@ export async function getCommitCountAhead(workspacePath: string, baseBranch: str
   }
 }
 
+export async function getCommitsAheadOfRemote(
+  workspacePath: string,
+  remoteBranch: string
+): Promise<{ count: number; commits: Array<{ hash: string; message: string }> }> {
+  try {
+    // Compare HEAD against the remote branch (works for both detached and branched states)
+    const remoteRef = remoteBranch.startsWith('origin/') ? remoteBranch : `origin/${remoteBranch}`;
+
+    // Get count of commits ahead
+    const countResult = await executeCommand(
+      ['git', 'rev-list', '--count', `${remoteRef}..HEAD`],
+      workspacePath
+    );
+    const count = parseInt(countResult.trim(), 10) || 0;
+
+    if (count === 0) {
+      return { count: 0, commits: [] };
+    }
+
+    // Get commit details
+    const logResult = await executeCommand(
+      ['git', 'log', '--oneline', `${remoteRef}..HEAD`],
+      workspacePath
+    );
+
+    const commits = logResult
+      .trim()
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const [hash, ...messageParts] = line.split(' ');
+        return { hash: hash || '', message: messageParts.join(' ') };
+      });
+
+    return { count, commits };
+  } catch (error) {
+    logger.debug(`Failed to get commits ahead of remote: ${error instanceof Error ? error.message : String(error)}`);
+    return { count: 0, commits: [] };
+  }
+}
+
 export async function getLastCommitInfo(repoPath: string, branchName?: string): Promise<{ message: string; date: Date; hash: string } | null> {
   try {
     const ref = branchName || 'HEAD';

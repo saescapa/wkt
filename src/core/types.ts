@@ -209,6 +209,7 @@ export interface SaveCommandOptions extends BaseCommandOptions {
   branch?: string;
   stash?: boolean;
   discard?: boolean;
+  push?: boolean;
 }
 
 // Safe script execution types
