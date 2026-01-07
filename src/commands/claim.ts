@@ -79,10 +79,18 @@ export async function claimCommand(
       console.log(chalk.gray(`  Updated to latest ${trackingBranch} (${commitSHA.substring(0, 7)})`));
 
     } else {
-      // Pool empty - create new detached workspace
-      console.log(chalk.blue(`Pool empty, creating new workspace...`));
+      // Pool empty - check if there are claimed workspaces that could be released
+      const claimedWorkspaces = dbManager.getClaimedWorkspaces(projectName);
+      const poolNamePattern = /^(?:.+-)?wksp-\d+$/;
+      const claimedPoolWorkspaces = claimedWorkspaces.filter(w => poolNamePattern.test(w.name));
 
-      const workspaceName = dbManager.getNextPoolWorkspaceName(projectName);
+      if (claimedPoolWorkspaces.length > 0) {
+        console.log(chalk.blue(`No available workspaces (${claimedPoolWorkspaces.length} in use), creating new...`));
+      } else {
+        console.log(chalk.blue(`Pool empty, creating new workspace...`));
+      }
+
+      const workspaceName = dbManager.getNextPoolWorkspaceName(projectName, trackingBranch);
       const workspaceId = BranchInference.generateWorkspaceId(projectName, workspaceName);
       const workspacePath = join(project.workspacesPath, workspaceName);
 

@@ -85,12 +85,15 @@ export async function releaseCommand(
 
     console.log(chalk.green(`✓ Reset to ${trackingBranch} (${commitSHA.substring(0, 7)})`));
 
-    // Update workspace record
+    // Update workspace record - reset to clean pool state
     workspace.mode = 'pooled';
     workspace.branchName = 'HEAD';
     workspace.trackingBranch = trackingBranch;
     workspace.baseCommit = commitSHA;
     workspace.claimedAt = undefined;
+    workspace.description = undefined;  // Clear description when releasing
+    workspace.commitsAhead = undefined;
+    workspace.commitsBehind = undefined;
     workspace.lastUsed = new Date();
     workspace.status = await getWorkspaceStatus(workspace.path);
 

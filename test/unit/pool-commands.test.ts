@@ -76,9 +76,9 @@ describe('Pool Commands - Database Operations', () => {
       // No pooled workspaces exist
       expect(dbManager.getPooledWorkspaces('test-project')).toHaveLength(0);
 
-      // Should generate new workspace name
-      const name = dbManager.getNextPoolWorkspaceName('test-project');
-      expect(name).toBe('wksp-1');
+      // Should generate new workspace name with tracking branch
+      const name = dbManager.getNextPoolWorkspaceName('test-project', 'main');
+      expect(name).toBe('main-wksp-1');
 
       // Create new claimed workspace
       const newWorkspace = testEnv.createMockWorkspace('test-project', name, 'claimed');
@@ -115,12 +115,12 @@ describe('Pool Commands - Database Operations', () => {
     });
 
     it('should transition workspace from branched to pooled', () => {
-      const branchedWorkspace = testEnv.createMockWorkspace('test-project', 'feature-1', 'branched');
+      // Use pool-style name - renamed workspaces won't be returned by getPooledWorkspaces
+      const branchedWorkspace = testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'branched');
       dbManager.addWorkspace(branchedWorkspace);
 
       // Verify initial state
       expect(branchedWorkspace.mode).toBe('branched');
-      expect(branchedWorkspace.branchName).toBe('feature/feature-1');
 
       // Simulate release operation (branched -> pooled)
       const workspace = dbManager.getWorkspace(branchedWorkspace.id);
@@ -136,6 +136,19 @@ describe('Pool Commands - Database Operations', () => {
       expect(updated?.mode).toBe('pooled');
       expect(updated?.branchName).toBe('HEAD');
       expect(dbManager.getPooledWorkspaces('test-project')).toHaveLength(1);
+    });
+
+    it('should not return renamed workspaces from pool', () => {
+      // A workspace that was renamed should not be claimable from pool
+      const renamedWorkspace = testEnv.createMockWorkspace('test-project', 'perf-test', 'pooled');
+      dbManager.addWorkspace(renamedWorkspace);
+
+      // Should not appear in pooled workspaces (doesn't match wksp-N pattern)
+      expect(dbManager.getPooledWorkspaces('test-project')).toHaveLength(0);
+
+      // But it's still in the database with mode 'pooled'
+      const ws = dbManager.getWorkspace(renamedWorkspace.id);
+      expect(ws?.mode).toBe('pooled');
     });
 
     it('should handle pool overflow by removing oldest workspaces', () => {
@@ -231,32 +244,41 @@ describe('Pool Commands - Database Operations', () => {
   });
 
   describe('workspace naming', () => {
-    it('should generate sequential wksp-N names', () => {
-      expect(dbManager.getNextPoolWorkspaceName('test-project')).toBe('wksp-1');
+    it('should generate sequential branch-wksp-N names', () => {
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-1');
 
-      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled'));
-      expect(dbManager.getNextPoolWorkspaceName('test-project')).toBe('wksp-2');
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'pooled'));
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-2');
 
-      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-2', 'claimed'));
-      expect(dbManager.getNextPoolWorkspaceName('test-project')).toBe('wksp-3');
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'main-wksp-2', 'claimed'));
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-3');
     });
 
-    it('should handle gaps in wksp-N naming', () => {
-      // Add wksp-1 and wksp-5 (skipping 2,3,4)
-      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled'));
-      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-5', 'pooled'));
+    it('should handle gaps in branch-wksp-N naming', () => {
+      // Add main-wksp-1 and main-wksp-5 (skipping 2,3,4)
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'pooled'));
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'main-wksp-5', 'pooled'));
 
-      // Should return wksp-6 (highest + 1)
-      expect(dbManager.getNextPoolWorkspaceName('test-project')).toBe('wksp-6');
+      // Should return main-wksp-6 (highest + 1)
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-6');
     });
 
     it('should not conflict with branched workspace names', () => {
       // Add a branched workspace with wksp- prefix (unusual but possible)
-      const branched = testEnv.createMockWorkspace('test-project', 'wksp-3', 'branched');
+      const branched = testEnv.createMockWorkspace('test-project', 'main-wksp-3', 'branched');
       dbManager.addWorkspace(branched);
 
-      // Should still return wksp-4
-      expect(dbManager.getNextPoolWorkspaceName('test-project')).toBe('wksp-4');
+      // Should still return main-wksp-4
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-4');
+    });
+
+    it('should be backwards compatible with old wksp-N format', () => {
+      // Old format workspaces should still be counted
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled'));
+      dbManager.addWorkspace(testEnv.createMockWorkspace('test-project', 'wksp-3', 'claimed'));
+
+      // Should continue from highest number
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-4');
     });
   });
 

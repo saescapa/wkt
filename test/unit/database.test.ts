@@ -246,21 +246,32 @@ describe('DatabaseManager', () => {
       expect(pooled).toHaveLength(0);
     });
 
-    it('should get next pool workspace name', () => {
-      const name1 = dbManager.getNextPoolWorkspaceName('test-project');
-      expect(name1).toBe('wksp-1');
+    it('should get next pool workspace name with tracking branch', () => {
+      const name1 = dbManager.getNextPoolWorkspaceName('test-project', 'main');
+      expect(name1).toBe('main-wksp-1');
 
-      const wksp1 = testEnv.createMockWorkspace('test-project', 'wksp-1', 'pooled');
+      const wksp1 = testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'pooled');
       dbManager.addWorkspace(wksp1);
 
-      const name2 = dbManager.getNextPoolWorkspaceName('test-project');
-      expect(name2).toBe('wksp-2');
+      const name2 = dbManager.getNextPoolWorkspaceName('test-project', 'main');
+      expect(name2).toBe('main-wksp-2');
 
-      const wksp5 = testEnv.createMockWorkspace('test-project', 'wksp-5', 'claimed');
+      const wksp5 = testEnv.createMockWorkspace('test-project', 'main-wksp-5', 'claimed');
       dbManager.addWorkspace(wksp5);
 
-      const name3 = dbManager.getNextPoolWorkspaceName('test-project');
-      expect(name3).toBe('wksp-6');
+      const name3 = dbManager.getNextPoolWorkspaceName('test-project', 'main');
+      expect(name3).toBe('main-wksp-6');
+    });
+
+    it('should handle different tracking branches separately', () => {
+      const wksp1 = testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'pooled');
+      const wksp2 = testEnv.createMockWorkspace('test-project', 'develop-wksp-1', 'pooled');
+      dbManager.addWorkspace(wksp1);
+      dbManager.addWorkspace(wksp2);
+
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'main')).toBe('main-wksp-2');
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'develop')).toBe('develop-wksp-2');
+      expect(dbManager.getNextPoolWorkspaceName('test-project', 'feature')).toBe('feature-wksp-1');
     });
 
     it('should filter pooled workspaces by project', () => {
