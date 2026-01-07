@@ -4,7 +4,9 @@ import { logger } from '../logger.js';
 export async function getCurrentBranch(workspacePath: string): Promise<string> {
   try {
     const result = await executeCommand(['git', 'branch', '--show-current'], workspacePath);
-    return result.trim();
+    const branch = result.trim();
+    // Empty string means detached HEAD state
+    return branch || 'HEAD';
   } catch (error) {
     logger.debug(`Failed to get current branch: ${error instanceof Error ? error.message : String(error)}`);
     return 'HEAD';
