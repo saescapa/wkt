@@ -146,6 +146,7 @@ program
   .option('--branch <name>', 'Create a branch from changes')
   .option('--stash', 'Stash changes')
   .option('--discard', 'Discard changes')
+  .option('--push', 'Push commits to remote without confirmation')
   .action(saveCommand);
 
 program

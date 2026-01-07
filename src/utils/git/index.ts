@@ -23,6 +23,7 @@ export {
   isWorkingTreeClean,
   getCommitsDiff,
   getCommitCountAhead,
+  getCommitsAheadOfRemote,
   getLastCommitInfo,
 } from './status.js';
-export { fetchAll, fetchInWorkspace, pullWithRebase, pushBranch } from './network.js';
+export { fetchAll, fetchInWorkspace, pullWithRebase, pushBranch, pushHEADToRemote } from './network.js';

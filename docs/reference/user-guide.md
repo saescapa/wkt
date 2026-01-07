@@ -267,6 +267,103 @@ wkt clean auth-system --force
 - `--force` - Skip confirmation
 - `--all` - Clean all (overrides --merged)
 
+---
+
+## Pool Commands
+
+Pool workspaces allow quick, temporary work without creating permanent branches.
+
+### `wkt claim`
+
+Claim a workspace from the pool for temporary work.
+
+```bash
+wkt claim [project] [options]
+```
+
+**Examples:**
+
+```bash
+# Claim from default project
+wkt claim
+
+# Claim from specific project
+wkt claim my-project
+
+# Track a specific branch
+wkt claim my-project --from develop
+```
+
+**Options:**
+- `--from <branch>` - Track a specific branch (default: project's default branch)
+
+### `wkt release`
+
+Release a workspace back to the pool.
+
+```bash
+wkt release [options]
+```
+
+**Examples:**
+
+```bash
+# Release current workspace
+wkt release
+
+# Force release with uncommitted changes
+wkt release --force
+```
+
+**Options:**
+- `--force` - Force release even with uncommitted changes
+
+### `wkt save`
+
+Save changes from a claimed workspace. Can create a branch, stash changes, discard changes, or push commits to remote.
+
+```bash
+wkt save [options]
+```
+
+**Examples:**
+
+```bash
+# Interactive mode (prompts for action)
+wkt save
+
+# Create a branch from changes
+wkt save --branch feature/my-feature
+
+# Stash uncommitted changes
+wkt save --stash
+
+# Discard uncommitted changes
+wkt save --discard
+
+# Push commits to remote without confirmation
+wkt save --push
+```
+
+**Options:**
+- `--branch <name>` - Create a branch from changes
+- `--stash` - Stash uncommitted changes
+- `--discard` - Discard uncommitted changes
+- `--push` - Push commits to remote without confirmation
+
+**Behavior:**
+
+1. **Uncommitted changes**: If you have uncommitted changes, save prompts to:
+   - Create a branch
+   - Stash changes
+   - Discard changes
+
+2. **Commits ahead**: If you have commits ahead of the remote tracking branch, save prompts to push them directly to remote.
+
+3. **--push flag**: Pushes commits to `origin/<tracking-branch>` (e.g., `origin/main`) without confirmation. Requires no uncommitted changes.
+
+---
+
 ### `wkt rename`
 
 Rename current workspace.

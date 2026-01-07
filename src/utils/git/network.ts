@@ -44,3 +44,11 @@ export async function pushBranch(workspacePath: string, branchName: string, forc
     `Push branch ${branchName}`
   );
 }
+
+export async function pushHEADToRemote(workspacePath: string, remoteBranch: string): Promise<void> {
+  // Push HEAD to the specified remote branch (useful for detached HEAD states)
+  await withRetry(
+    () => executeCommand(['git', 'push', 'origin', `HEAD:${remoteBranch}`], workspacePath),
+    `Push HEAD to origin/${remoteBranch}`
+  );
+}
