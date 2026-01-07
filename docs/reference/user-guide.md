@@ -299,10 +299,10 @@ wkt claim my-project --from develop
 
 ### `wkt release`
 
-Release a workspace back to the pool.
+Release a workspace back to the pool. Resets the workspace to a clean state (detached HEAD at the tracking branch).
 
 ```bash
-wkt release [options]
+wkt release [workspace] [options]
 ```
 
 **Examples:**
@@ -311,8 +311,14 @@ wkt release [options]
 # Release current workspace
 wkt release
 
+# Release a specific workspace by name
+wkt release main-wksp-1
+
 # Force release with uncommitted changes
 wkt release --force
+
+# Release specific workspace with force
+wkt release main-wksp-1 --force
 ```
 
 **Options:**

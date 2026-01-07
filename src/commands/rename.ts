@@ -40,6 +40,18 @@ export async function renameCommand(
       throw new Error(`Project '${workspace.projectName}' not found`);
     }
 
+    // Protect main workspaces - they contain shared files
+    const mainBranchNames = [project.defaultBranch, 'main', 'master'];
+    const isMainWorkspace = mainBranchNames.some(branchName =>
+      workspace.branchName === branchName || workspace.name === branchName
+    );
+
+    if (isMainWorkspace) {
+      console.log(chalk.red(`✗ Cannot rename main workspace '${workspace.name}'`));
+      console.log(chalk.gray('Main workspaces are protected because they contain shared files that other workspaces symlink to.'));
+      return;
+    }
+
     const config = configManager.getConfig();
     const projectConfig = configManager.getProjectConfig(workspace.projectName);
 

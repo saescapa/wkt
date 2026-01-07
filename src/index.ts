@@ -137,6 +137,7 @@ program
 program
   .command('release')
   .description('Release workspace back to pool')
+  .argument('[workspace]', 'Workspace name (uses current directory if omitted)')
   .option('--force', 'Force release with uncommitted changes')
   .action(releaseCommand);
 

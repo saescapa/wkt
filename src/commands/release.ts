@@ -12,19 +12,30 @@ import { SafeScriptExecutor } from '../utils/script-executor.js';
 import { ErrorHandler, WKTError } from '../utils/errors.js';
 
 export async function releaseCommand(
+  workspaceName?: string,
   options: ReleaseCommandOptions = {}
 ): Promise<void> {
   try {
     const configManager = new ConfigManager();
     const dbManager = new DatabaseManager();
 
-    // Detect workspace from current directory
-    const workspace = dbManager.getCurrentWorkspaceContext();
-
-    if (!workspace) {
-      console.log(chalk.yellow('Not in a workspace directory.'));
-      console.log(chalk.gray('Navigate to a workspace first, or use `wkt list` to see workspaces.'));
-      return;
+    // Find workspace by name or current directory
+    let workspace;
+    if (workspaceName) {
+      const allWorkspaces = dbManager.getAllWorkspaces();
+      workspace = allWorkspaces.find(w => w.name === workspaceName);
+      if (!workspace) {
+        console.log(chalk.red(`Workspace '${workspaceName}' not found`));
+        console.log(chalk.gray('Use `wkt list` to see available workspaces.'));
+        return;
+      }
+    } else {
+      workspace = dbManager.getCurrentWorkspaceContext();
+      if (!workspace) {
+        console.log(chalk.yellow('Not in a workspace directory.'));
+        console.log(chalk.gray('Navigate to a workspace first, specify a workspace name, or use `wkt list` to see workspaces.'));
+        return;
+      }
     }
 
     const project = dbManager.getProject(workspace.projectName);
@@ -38,6 +49,23 @@ export async function releaseCommand(
 
     const config = configManager.getConfig();
     const projectConfig = configManager.getProjectConfig(workspace.projectName);
+
+    // Protect main workspaces - they contain shared files
+    const mainBranchNames = [project.defaultBranch, 'main', 'master'];
+    const isMainWorkspace = mainBranchNames.some(branchName =>
+      workspace.branchName === branchName || workspace.name === branchName
+    );
+
+    if (isMainWorkspace) {
+      throw new WKTError(
+        `Cannot release main workspace '${workspace.name}' (contains shared files)`,
+        'MAIN_WORKSPACE_PROTECTED',
+        true,
+        [
+          { text: 'Main workspaces are protected because they contain shared files that other workspaces symlink to' }
+        ]
+      );
+    }
 
     // Check for uncommitted changes
     const status = await getWorkspaceStatus(workspace.path);

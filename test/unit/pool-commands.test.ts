@@ -315,4 +315,44 @@ describe('Pool Commands - Database Operations', () => {
       expect(retrieved?.trackingBranch).toBe('develop');
     });
   });
+
+  describe('main workspace protection', () => {
+    function isMainWorkspace(workspace: Workspace, project: Project): boolean {
+      const mainBranchNames = [project.defaultBranch, 'main', 'master'];
+      return mainBranchNames.some(branchName =>
+        workspace.branchName === branchName || workspace.name === branchName
+      );
+    }
+
+    it('should identify main workspace by name', () => {
+      const mainWorkspace = testEnv.createMockWorkspace('test-project', 'main', 'branched');
+      expect(isMainWorkspace(mainWorkspace, testProject)).toBe(true);
+    });
+
+    it('should identify main workspace by branch name', () => {
+      const mainWorkspace = testEnv.createMockWorkspace('test-project', 'feature-test', 'branched');
+      mainWorkspace.branchName = 'main';
+      expect(isMainWorkspace(mainWorkspace, testProject)).toBe(true);
+    });
+
+    it('should identify master workspace by name', () => {
+      const masterWorkspace = testEnv.createMockWorkspace('test-project', 'master', 'branched');
+      expect(isMainWorkspace(masterWorkspace, testProject)).toBe(true);
+    });
+
+    it('should identify default branch workspace', () => {
+      const defaultBranchWorkspace = testEnv.createMockWorkspace('test-project', testProject.defaultBranch, 'branched');
+      expect(isMainWorkspace(defaultBranchWorkspace, testProject)).toBe(true);
+    });
+
+    it('should not identify regular workspace as main', () => {
+      const regularWorkspace = testEnv.createMockWorkspace('test-project', 'feature-auth', 'branched');
+      expect(isMainWorkspace(regularWorkspace, testProject)).toBe(false);
+    });
+
+    it('should not identify pool workspace as main', () => {
+      const poolWorkspace = testEnv.createMockWorkspace('test-project', 'main-wksp-1', 'pooled');
+      expect(isMainWorkspace(poolWorkspace, testProject)).toBe(false);
+    });
+  });
 });

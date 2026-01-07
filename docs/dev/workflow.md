@@ -65,18 +65,31 @@ No code change is complete without corresponding test coverage.
 **Setup:**
 ```bash
 bun install
-bun run dev         # Run from source (uses real ~/.wkt)
-bun run dev:safe    # Run in isolated temp directory (safe for testing)
+bun run dev         # Run from source (uses real ~/.wkt) - DANGEROUS
+bun run dev:safe    # Run in isolated temp directory (ALWAYS USE THIS)
 ```
+
+**⚠️ CRITICAL: Always use `dev:safe` for manual testing**
 
 The `dev:safe` script sets `WKT_HOME` to a temporary directory, preventing accidental modifications to your production `~/.wkt` data during development.
 
+**Never use `bun run dev` for testing** - it operates on your real workspaces and can:
+- Delete or corrupt production workspaces
+- Release or rename your main workspace (breaking symlinks)
+- Modify your actual project data
+
 **Environment Isolation:**
 ```bash
-# Use a custom WKT directory (useful for testing)
+# ALWAYS use dev:safe for manual testing
+bun run dev:safe list
+bun run dev:safe claim my-project
+bun run dev:safe release
+
+# Or set WKT_HOME explicitly for a persistent test directory
 WKT_HOME=/tmp/wkt-test bun run dev list
 
-# Tests automatically use isolated directories via WKT_HOME
+# Automated tests use isolated directories automatically via WKT_HOME
+bun test
 ```
 
 **Before committing:**
@@ -108,7 +121,7 @@ Before ending a development session:
 ### Testing
 - [ ] **Tests written/updated** - All code changes have corresponding test coverage
 - [ ] **Tests pass** - `bun test` succeeds
-- [ ] **Changes verified** - Manual smoke test of changed functionality
+- [ ] **Changes verified** - Manual smoke test using `bun run dev:safe` (NEVER `bun run dev`)
 
 ### Code Quality
 - [ ] **Types check** - `bun run typecheck` succeeds
