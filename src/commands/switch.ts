@@ -55,39 +55,16 @@ export async function switchCommand(
         // Handle multiple matches - if --path-only, try to be smart about selection
         if (options.pathOnly) {
           // For path-only mode (used by shell functions), implement cycling behavior
+          // matches are already sorted with best match first (exact name, then shorter names)
           const currentWorkspace = dbManager.getCurrentWorkspaceContext();
+          const bestMatch = matches[0]!;
 
-          if (currentWorkspace && matches.find(w => w.id === currentWorkspace.id)) {
-            // Current workspace is one of the matches - cycle to the next one
-            const sortedMatches = matches.sort((a, b) => {
-              // Sort by project name first, then by name for consistent ordering
-              if (a.projectName !== b.projectName) {
-                return a.projectName.localeCompare(b.projectName);
-              }
-              return a.name.localeCompare(b.name);
-            });
-
-            const currentIndex = sortedMatches.findIndex(w => w.id === currentWorkspace.id);
-            const nextIndex = (currentIndex + 1) % sortedMatches.length;
-            selectedWorkspace = sortedMatches[nextIndex];
+          if (currentWorkspace && bestMatch.id === currentWorkspace.id) {
+            // Already in the best match - cycle to the next one
+            selectedWorkspace = matches[1];
           } else {
-            // Not currently in one of the matches - prefer current project, then most recent
-            if (currentWorkspace) {
-              const currentProjectMatch = matches.find(w => w.projectName === currentWorkspace.projectName);
-              if (currentProjectMatch) {
-                selectedWorkspace = currentProjectMatch;
-              } else {
-                // No current project match, use most recently used
-                selectedWorkspace = matches.sort((a, b) =>
-                  new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
-                )[0];
-              }
-            } else {
-              // No current workspace, use most recently used
-              selectedWorkspace = matches.sort((a, b) =>
-                new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
-              )[0];
-            }
+            // Not in the best match - use it
+            selectedWorkspace = bestMatch;
           }
         } else {
           // Interactive mode for normal usage
@@ -156,21 +133,39 @@ export async function switchCommand(
 }
 
 function findWorkspaceMatches(workspaces: Workspace[], query: string): Workspace[] {
-  const exactMatches = workspaces.filter(w => 
-    w.name === query || 
+  const lowerQuery = query.toLowerCase();
+
+  // Exact match on id or full project/name path - return immediately
+  const idOrPathExact = workspaces.filter(w =>
     w.id === query ||
     `${w.projectName}/${w.name}` === query
   );
 
-  if (exactMatches.length > 0) {
-    return exactMatches;
+  if (idOrPathExact.length > 0) {
+    return idOrPathExact;
   }
 
-  return workspaces.filter(w => 
-    w.name.toLowerCase().includes(query.toLowerCase()) ||
-    w.branchName.toLowerCase().includes(query.toLowerCase()) ||
-    `${w.projectName}/${w.name}`.toLowerCase().includes(query.toLowerCase())
+  // Find all partial matches (name, branch, or project/name contains query)
+  const partialMatches = workspaces.filter(w =>
+    w.name.toLowerCase().includes(lowerQuery) ||
+    w.branchName.toLowerCase().includes(lowerQuery) ||
+    `${w.projectName}/${w.name}`.toLowerCase().includes(lowerQuery)
   );
+
+  if (partialMatches.length === 0) {
+    return [];
+  }
+
+  // Sort: exact name matches first, then shorter names (more specific)
+  return partialMatches.sort((a, b) => {
+    const aExactName = a.name.toLowerCase() === lowerQuery;
+    const bExactName = b.name.toLowerCase() === lowerQuery;
+
+    if (aExactName && !bExactName) return -1;
+    if (!aExactName && bExactName) return 1;
+
+    return a.name.length - b.name.length;
+  });
 }
 
 async function selectWorkspaceInteractively(
