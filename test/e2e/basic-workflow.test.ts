@@ -193,15 +193,6 @@ describe('WKT CLI', () => {
       expect(help).toContain('--older-than');
     });
 
-    it('save command help', async () => {
-      const help = await getHelp('save');
-
-      expect(help).toContain('Save changes from claimed workspace');
-      expect(help).toContain('--branch');
-      expect(help).toContain('--stash');
-      expect(help).toContain('--discard');
-      expect(help).toContain('--push');
-    });
   });
 
   describe('Full Workflow', () => {

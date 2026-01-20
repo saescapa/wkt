@@ -181,42 +181,4 @@ export class DatabaseManager {
     return this.getWorkspaceFromPath();
   }
 
-  getPooledWorkspaces(projectName: string): Workspace[] {
-    // Only return workspaces that are pooled AND match the pool naming pattern
-    // Renamed workspaces (like "perf-test") are not considered pooled
-    const poolNamePattern = /^(?:.+-)?wksp-\d+$/;
-    return this.getWorkspacesByProject(projectName)
-      .filter(w => w.mode === 'pooled' && poolNamePattern.test(w.name))
-      .sort((a, b) => a.lastUsed.getTime() - b.lastUsed.getTime()); // Oldest first
-  }
-
-  getClaimedWorkspaces(projectName: string): Workspace[] {
-    return this.getWorkspacesByProject(projectName)
-      .filter(w => w.mode === 'claimed')
-      .sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime()); // Most recent first
-  }
-
-  getNextPoolWorkspaceName(projectName: string, trackingBranch: string): string {
-    const allWorkspaces = this.getWorkspacesByProject(projectName);
-
-    // Match both old format (wksp-N) and new format (branch-wksp-N)
-    const poolPattern = new RegExp(`^(?:${trackingBranch}-)?wksp-(\\d+)$`);
-    const poolWorkspaces = allWorkspaces.filter(w =>
-      w.mode === 'pooled' || w.mode === 'claimed' || poolPattern.test(w.name)
-    );
-
-    // Find the highest wksp-N number and increment
-    let maxNum = 0;
-    for (const ws of poolWorkspaces) {
-      const match = ws.name.match(poolPattern);
-      if (match && match[1]) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) {
-          maxNum = num;
-        }
-      }
-    }
-
-    return `${trackingBranch}-wksp-${maxNum + 1}`;
-  }
 }

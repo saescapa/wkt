@@ -73,16 +73,6 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
-  // Filter by pool (claimed or pooled workspaces)
-  if (options.pool) {
-    workspaces = workspaces.filter(w => w.mode === 'claimed' || w.mode === 'pooled');
-
-    if (workspaces.length === 0) {
-      console.log(chalk.yellow('No pooled or claimed workspaces.'));
-      return;
-    }
-  }
-
   const currentWorkspace = dbManager.getCurrentWorkspaceContext();
 
   // Separate active vs inactive workspaces
@@ -150,17 +140,10 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     console.log(chalk.dim(`Inactive: ${inactiveList}`));
   }
 
-  // Show pool summary when using --pool flag
-  if (options.pool) {
-    const pooledCount = workspaces.filter(w => w.mode === 'pooled').length;
-    console.log(chalk.dim('─'.repeat(40)));
-    console.log(chalk.gray(`(${pooledCount} available in pool)`));
-  }
-
   // Show legend
   console.log();
   console.log(chalk.dim('─'.repeat(40)));
-  console.log(chalk.dim(`${chalk.green('●')} active  ${chalk.blue('○')} workspace  ${chalk.cyan('◇')} pooled  ${chalk.yellow('◐')} dirty  ${chalk.red('✗')} conflict`));
+  console.log(chalk.dim(`${chalk.green('●')} active  ${chalk.blue('○')} workspace  ${chalk.yellow('◐')} dirty  ${chalk.red('✗')} conflict`));
 }
 
 function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
@@ -169,7 +152,7 @@ function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Wor
   Object.entries(projectGroups).forEach(([projectName, projectWorkspaces]) => {
     console.log(chalk.bold(`${projectName}/`));
 
-    const branchGroups = groupByTrackingBranch(projectWorkspaces);
+    const branchGroups = groupByBaseBranch(projectWorkspaces);
 
     Object.entries(branchGroups).forEach(([branchName, branchWorkspaces]) => {
       console.log(chalk.dim(`  ${branchName}:`));
@@ -187,46 +170,18 @@ function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Wor
   });
 }
 
-// Extract pool number from workspace name (e.g., "main-wksp-3" -> 3, "wksp-1" -> 1)
-function getPoolNumber(name: string): number | null {
-  const match = name.match(/wksp-(\d+)$/);
-  return match && match[1] ? parseInt(match[1], 10) : null;
-}
-
-function groupByTrackingBranch(workspaces: Workspace[]): Record<string, Workspace[]> {
+function groupByBaseBranch(workspaces: Workspace[]): Record<string, Workspace[]> {
   const groups: Record<string, Workspace[]> = {};
 
   for (const ws of workspaces) {
-    const trackingBranch = ws.trackingBranch ?? ws.baseBranch;
-    if (!groups[trackingBranch]) {
-      groups[trackingBranch] = [];
+    if (!groups[ws.baseBranch]) {
+      groups[ws.baseBranch] = [];
     }
-    groups[trackingBranch]!.push(ws);
+    groups[ws.baseBranch]!.push(ws);
   }
 
   for (const group of Object.values(groups)) {
-    group.sort((a, b) => {
-      const aPoolNum = getPoolNumber(a.name);
-      const bPoolNum = getPoolNumber(b.name);
-      const aIsPool = aPoolNum !== null;
-      const bIsPool = bPoolNum !== null;
-
-      // Pool workspaces come first
-      if (aIsPool && !bIsPool) return -1;
-      if (!aIsPool && bIsPool) return 1;
-
-      // Both are pool workspaces - sort by number, then by availability
-      if (aIsPool && bIsPool) {
-        // Available (pooled) before in-use (claimed)
-        if (a.mode === 'pooled' && b.mode !== 'pooled') return -1;
-        if (a.mode !== 'pooled' && b.mode === 'pooled') return 1;
-        // Then by number
-        return aPoolNum! - bPoolNum!;
-      }
-
-      // Neither are pool workspaces - sort by lastUsed
-      return b.lastUsed.getTime() - a.lastUsed.getTime();
-    });
+    group.sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime());
   }
 
   return groups;
@@ -245,7 +200,7 @@ function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, show
 }
 
 function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolean, showDetails?: boolean, includeProject?: boolean): string {
-  const modeIcon = getModeIcon(workspace, isCurrent);
+  const modeIcon = getModeIcon(isCurrent);
   const dirtyIndicator = getDirtyIndicator(workspace);
   const statusText = getStatusText(workspace);
   const timeAgo = formatTimeAgo(workspace.lastUsed);
@@ -264,10 +219,6 @@ function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolea
     }
     line += `\n${prefix}    Branch: ${chalk.cyan(workspace.branchName)}`;
     line += `\n${prefix}    Base: ${chalk.gray(workspace.baseBranch)}`;
-    if (workspace.trackingBranch) {
-      line += `\n${prefix}    Tracking: ${chalk.gray(workspace.trackingBranch)}`;
-    }
-    line += `\n${prefix}    Mode: ${chalk.gray(workspace.mode)}`;
     line += `\n${prefix}    Path: ${chalk.gray(workspace.path)}`;
     line += `\n${prefix}    Status: ${statusText}`;
     line += `\n${prefix}    Created: ${chalk.gray(workspace.createdAt.toLocaleDateString())}`;
@@ -281,7 +232,7 @@ function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolea
       if (behind > 0) line += chalk.red(`-${behind}`);
     }
   } else {
-    const modeLabel = getModeLabel(workspace, isCurrent);
+    const modeLabel = getModeLabel(isCurrent);
     if (modeLabel) {
       line += ` ${chalk.gray(modeLabel)}`;
     }
@@ -297,29 +248,17 @@ function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolea
   return line;
 }
 
-function getModeIcon(workspace: Workspace, isCurrent: boolean): string {
+function getModeIcon(isCurrent: boolean): string {
   if (isCurrent) {
     return chalk.green('●');
   }
-  switch (workspace.mode) {
-    case 'pooled':
-      return chalk.cyan('◇');
-    case 'claimed':
-    case 'branched':
-    default:
-      return chalk.blue('○');
-  }
+  return chalk.blue('○');
 }
 
-function getModeLabel(workspace: Workspace, isCurrent: boolean): string {
+function getModeLabel(isCurrent: boolean): string {
   if (isCurrent) {
     return 'active';
   }
-  // Only show label for pooled workspaces
-  if (workspace.mode === 'pooled') {
-    return 'pooled';
-  }
-  // Claimed and branched show no label
   return '';
 }
 

@@ -64,8 +64,7 @@ All TypeScript interfaces are defined in `src/core/types.ts`. Key types include:
 |-----------|---------|
 | `WKTDatabase` | Root database structure with projects, workspaces, and metadata |
 | `Project` | Repository metadata (name, paths, default branch) |
-| `Workspace` | Worktree metadata (branch, path, status, mode, timestamps) |
-| `WorkspaceMode` | Workspace type: `branched`, `claimed`, or `pooled` |
+| `Workspace` | Worktree metadata (branch, path, status, timestamps) |
 | `WorkspaceStatus` | Git status counts (staged, unstaged, untracked, conflicted) |
 | `GlobalConfig` | Full configuration structure |
 | `ProjectConfig` | Project-specific configuration overrides |

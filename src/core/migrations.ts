@@ -1,4 +1,4 @@
-import type { WKTDatabase, Workspace } from './types.js';
+import type { WKTDatabase } from './types.js';
 import { logger } from '../utils/logger.js';
 
 export const CURRENT_SCHEMA_VERSION = 3;
@@ -13,24 +13,13 @@ export interface Migration {
 export const migrations: Migration[] = [
   {
     version: 2,
-    description: 'Add mode field to workspaces',
-    migrate: (db): WKTDatabase => {
-      for (const workspace of Object.values(db.workspaces)) {
-        if (!(workspace as Workspace).mode) {
-          (workspace as Workspace).mode = 'branched';
-        }
-      }
-      return db;
-    }
+    description: 'Schema update (no-op)',
+    migrate: (db): WKTDatabase => db
   },
   {
     version: 3,
-    description: 'Add claimedAt and baseCommit fields for pool workspaces',
-    migrate: (db): WKTDatabase => {
-      // No data transformation needed - new fields are optional
-      // claimedAt and baseCommit will be populated when workspaces are claimed/released
-      return db;
-    }
+    description: 'Schema update (no-op)',
+    migrate: (db): WKTDatabase => db
   }
 ];
 
