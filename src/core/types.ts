@@ -177,6 +177,7 @@ export interface InitCommandOptions {
   list?: boolean;
   template?: string;
   applyTemplate?: boolean;
+  local?: boolean;
 }
 
 export interface RenameCommandOptions extends BaseCommandOptions {

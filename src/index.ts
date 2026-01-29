@@ -59,6 +59,7 @@ program
   .option('-l, --list', 'List all managed projects')
   .option('-t, --template <name>', 'Apply a project template during initialization')
   .option('--apply-template', 'Apply template to an existing project (first argument becomes project name)')
+  .option('--local', 'Create a new local project without a remote repository')
   .action(initCommand);
 
 program

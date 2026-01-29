@@ -1,6 +1,6 @@
 // Re-export all git utilities from their modules
 export { executeCommand, parseDuration } from './command.js';
-export { isGitRepository, getBareRepoUrl, cloneBareRepository, getDefaultBranch } from './repository.js';
+export { isGitRepository, getBareRepoUrl, cloneBareRepository, initBareRepository, getDefaultBranch } from './repository.js';
 export {
   getCurrentBranch,
   branchExists,

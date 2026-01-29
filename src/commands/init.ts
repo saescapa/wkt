@@ -9,6 +9,7 @@ import {
   isGitRepository,
   getBareRepoUrl,
   cloneBareRepository,
+  initBareRepository,
   getDefaultBranch,
   fetchAll,
   createWorktree,
@@ -60,57 +61,71 @@ export async function initCommand(
       return;
     }
 
-    let repoUrl = repositoryUrl;
-    let inferredProjectName = projectName;
+    let repoUrl: string;
+    let inferredProjectName: string;
 
-    if (!repoUrl) {
-      if (isGitRepository(process.cwd())) {
-        try {
-          repoUrl = await getBareRepoUrl(process.cwd());
-          if (!inferredProjectName) {
-            inferredProjectName = basename(process.cwd());
-          }
-          console.log(chalk.blue(`Found git repository: ${repoUrl}`));
-        } catch {
-          throw new GitRepositoryError('Current directory is not a valid git repository or has no remote origin');
-        }
-      } else {
-        // Interactive mode - prompt for repository URL
-        console.log(chalk.blue('\nInitialize new project\n'));
+    if (options.local) {
+      // --local: first positional arg is the project name, not a URL
+      if (projectName) {
+        throw new ValidationError('arguments', 'Too many arguments for --local (expected: wkt init --local <project-name>)');
+      }
+      if (!repositoryUrl) {
+        throw new ValidationError('project name', 'Project name is required when using --local');
+      }
+      inferredProjectName = repositoryUrl;
+      repoUrl = 'local';
+    } else {
+      repoUrl = repositoryUrl ?? '';
+      inferredProjectName = projectName ?? '';
 
-        const { inputUrl } = await inquirer.prompt([{
-          type: 'input',
-          name: 'inputUrl',
-          message: 'Repository URL (git clone URL):',
-          validate: (input: string) => {
-            if (!input.trim()) return 'Repository URL is required';
-            if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
-              return 'Please enter a valid git repository URL';
+      if (!repoUrl) {
+        if (isGitRepository(process.cwd())) {
+          try {
+            repoUrl = await getBareRepoUrl(process.cwd());
+            if (!inferredProjectName) {
+              inferredProjectName = basename(process.cwd());
             }
-            return true;
+            console.log(chalk.blue(`Found git repository: ${repoUrl}`));
+          } catch {
+            throw new GitRepositoryError('Current directory is not a valid git repository or has no remote origin');
           }
-        }]);
+        } else {
+          // Interactive mode - prompt for repository URL
+          console.log(chalk.blue('\nInitialize new project\n'));
 
-        if (!inputUrl.trim()) {
-          console.log(chalk.yellow('Initialization cancelled'));
-          return;
+          const { inputUrl } = await inquirer.prompt([{
+            type: 'input',
+            name: 'inputUrl',
+            message: 'Repository URL (git clone URL):',
+            validate: (input: string) => {
+              if (!input.trim()) return 'Repository URL is required';
+              if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
+                return 'Please enter a valid git repository URL';
+              }
+              return true;
+            }
+          }]);
+
+          if (!inputUrl.trim()) {
+            console.log(chalk.yellow('Initialization cancelled'));
+            return;
+          }
+          repoUrl = inputUrl.trim();
         }
-        repoUrl = inputUrl.trim();
       }
-    }
 
-    // At this point repoUrl must be set
-    if (!repoUrl) {
-      throw new ValidationError('repository URL', 'Repository URL is required');
-    }
-
-    if (!inferredProjectName) {
-      const urlParts = repoUrl.split('/');
-      const lastPart = urlParts[urlParts.length - 1];
-      if (!lastPart) {
-        throw new ValidationError('project name', 'Could not infer project name from repository URL');
+      if (!repoUrl) {
+        throw new ValidationError('repository URL', 'Repository URL is required');
       }
-      inferredProjectName = lastPart.replace(/\.git$/, '');
+
+      if (!inferredProjectName) {
+        const urlParts = repoUrl.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (!lastPart) {
+          throw new ValidationError('project name', 'Could not infer project name from repository URL');
+        }
+        inferredProjectName = lastPart.replace(/\.git$/, '');
+      }
     }
 
     if (dbManager.getProject(inferredProjectName)) {
@@ -133,10 +148,14 @@ export async function initCommand(
       throw new DirectoryExistsError(bareRepoPath);
     }
 
-    console.log(chalk.gray(`Cloning bare repository to ${bareRepoPath}...`));
-    await cloneBareRepository(repoUrl, bareRepoPath);
-
-    await fetchAll(bareRepoPath);
+    if (options.local) {
+      console.log(chalk.gray(`Initializing bare repository at ${bareRepoPath}...`));
+      await initBareRepository(bareRepoPath);
+    } else {
+      console.log(chalk.gray(`Cloning bare repository to ${bareRepoPath}...`));
+      await cloneBareRepository(repoUrl, bareRepoPath);
+      await fetchAll(bareRepoPath);
+    }
 
     const defaultBranch = await getDefaultBranch(bareRepoPath);
 
@@ -229,7 +248,9 @@ export async function initCommand(
     }
 
     console.log(chalk.green(`✓ Successfully initialized project '${inferredProjectName}'`));
-    console.log(chalk.gray(`  Repository: ${repoUrl}`));
+    if (!options.local) {
+      console.log(chalk.gray(`  Repository: ${repoUrl}`));
+    }
     console.log(chalk.gray(`  Default branch: ${defaultBranch}`));
     if (selectedTemplate) {
       console.log(chalk.gray(`  Template: ${selectedTemplate}`));

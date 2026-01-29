@@ -24,36 +24,48 @@ export async function createWorktree(
     // Handle empty repository case - create orphan branch
     if (errorMessage.includes('not a valid object name') ||
         errorMessage.includes('fatal: not a valid object name') ||
-        errorMessage.includes('invalid reference: HEAD')) {
+        errorMessage.includes('invalid reference:')) {
       logger.debug('Detected empty repository, creating initial workspace structure');
-
-      const originUrl = await executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
 
       // Create workspace directory
       await executeCommand(['mkdir', '-p', workspacePath], undefined);
 
       // Initialize workspace as git repository
       await executeCommand(['git', 'init'], workspacePath);
-      await executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
+
+      // Set up origin remote if the bare repo has one
+      let hasOrigin = false;
+      try {
+        const originUrl = await executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
+        await executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
+        hasOrigin = true;
+      } catch {
+        logger.debug('No origin remote in bare repo, skipping remote setup');
+      }
 
       // Create and checkout the new branch
       await executeCommand(['git', 'checkout', '-b', branchName], workspacePath);
 
       // Try to fetch from remote to see if there are any commits
-      try {
-        await executeCommand(['git', 'fetch', 'origin'], workspacePath);
+      if (hasOrigin) {
         try {
-          await executeCommand(['git', 'merge', `origin/${baseBranch || 'main'}`], workspacePath);
-        } catch {
+          await executeCommand(['git', 'fetch', 'origin'], workspacePath);
           try {
-            await executeCommand(['git', 'merge', 'origin/master'], workspacePath);
+            await executeCommand(['git', 'merge', `origin/${baseBranch || 'main'}`], workspacePath);
           } catch {
-            logger.debug('No remote branches to merge, creating initial commit');
-            await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+            try {
+              await executeCommand(['git', 'merge', 'origin/master'], workspacePath);
+            } catch {
+              logger.debug('No remote branches to merge, creating initial commit');
+              await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+            }
           }
+        } catch {
+          logger.debug('No remote refs available, creating initial commit');
+          await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
         }
-      } catch {
-        logger.debug('No remote refs available, creating initial commit');
+      } else {
+        logger.debug('No remote configured, creating initial commit');
         await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
       }
     } else {

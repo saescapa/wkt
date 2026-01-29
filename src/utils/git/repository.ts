@@ -36,6 +36,10 @@ export async function cloneBareRepository(repoUrl: string, targetPath: string): 
   }
 }
 
+export async function initBareRepository(targetPath: string): Promise<void> {
+  await executeCommand(['git', 'init', '--bare', targetPath]);
+}
+
 export async function getDefaultBranch(bareRepoPath: string): Promise<string> {
   try {
     const result = await executeCommand(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'], bareRepoPath);
