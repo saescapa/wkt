@@ -158,18 +158,18 @@ describe('Run Workflow', () => {
   }
 
   describe('Workflow 1: List scripts (no config)', () => {
-    it('should initialize project and claim workspace', async () => {
+    it('should initialize project and create workspace', async () => {
       const initResult = await wkt(['init', sourceRepo, projectName]);
       expect(initResult.exitCode).toBe(0);
       expect(initResult.stdout).toContain('Successfully initialized');
 
-      const claimResult = await wkt(['claim', projectName]);
-      expect(claimResult.exitCode).toBe(0);
-      expect(claimResult.stdout).toContain('wksp-1');
+      const createResult = await wkt(['create', projectName, 'feature/test-run']);
+      expect(createResult.exitCode).toBe(0);
+      expect(createResult.stdout).toContain('test-run');
     });
 
     it('should list available scripts (empty without config)', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run', 'list'], { cwd: workspacePath });
 
       // Without config, there's no script configuration
@@ -186,7 +186,7 @@ describe('Run Workflow', () => {
 
   describe('Workflow 2: Run with no scripts configured', () => {
     it('should show no scripts message when running without script name', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run'], { cwd: workspacePath });
 
       // Without scripts configured, command should indicate no scripts available
@@ -202,7 +202,7 @@ describe('Run Workflow', () => {
   describe('Workflow 3: Configured scripts', () => {
     it('should add config and list configured scripts', async () => {
       // Create config in workspace
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       createWorkspaceConfig(workspacePath);
 
       const result = await wkt(['run', 'list'], { cwd: workspacePath });
@@ -214,7 +214,7 @@ describe('Run Workflow', () => {
     });
 
     it('should show dry run output without executing', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       // Note: --dry still requires --force to skip confirmation prompt
       const result = await wkt(['run', 'test-echo', '--dry', '--force'], { cwd: workspacePath });
 
@@ -228,7 +228,7 @@ describe('Run Workflow', () => {
     });
 
     it('should execute script with --force flag', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run', 'test-echo', '--force'], { cwd: workspacePath });
 
       expect(result.exitCode).toBe(0);
@@ -239,7 +239,7 @@ describe('Run Workflow', () => {
 
   describe('Workflow 4: Error cases', () => {
     it('should error for non-existent script', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run', 'nonexistent-script', '--force'], { cwd: workspacePath });
 
       // Script not found should result in error
@@ -263,7 +263,7 @@ describe('Run Workflow', () => {
     });
 
     it('should error for invalid workspace identifier', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run', 'test-echo', 'nonexistent/workspace'], { cwd: workspacePath });
 
       // Should indicate workspace not found
@@ -279,28 +279,28 @@ describe('Run Workflow', () => {
   describe('Workflow 5: Workspace targeting', () => {
     it('should create second workspace and run script targeting it', async () => {
       // Create another workspace
-      const claimResult = await wkt(['claim', projectName]);
-      expect(claimResult.exitCode).toBe(0);
-      expect(claimResult.stdout).toContain('wksp-2');
+      const createResult = await wkt(['create', projectName, 'feature/test-target']);
+      expect(createResult.exitCode).toBe(0);
+      expect(createResult.stdout).toContain('test-target');
 
-      // Add config to wksp-2
-      const wksp2Path = getWorkspacePath('wksp-2');
+      // Add config to test-target
+      const wksp2Path = getWorkspacePath('test-target');
       createWorkspaceConfig(wksp2Path);
 
-      // Run from wksp-1 targeting wksp-2
-      const workspacePath = getWorkspacePath('wksp-1');
-      const result = await wkt(['run', 'test-echo', `${projectName}/wksp-2`, '--force'], { cwd: workspacePath });
+      // Run from test-run targeting test-target
+      const workspacePath = getWorkspacePath('test-run');
+      const result = await wkt(['run', 'test-echo', `${projectName}/test-target`, '--force'], { cwd: workspacePath });
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('wksp-2');
+      expect(result.stdout).toContain('test-target');
     });
 
     it('should run script in current workspace using dot shortcut', async () => {
-      const workspacePath = getWorkspacePath('wksp-1');
+      const workspacePath = getWorkspacePath('test-run');
       const result = await wkt(['run', 'test-echo', '.', '--force'], { cwd: workspacePath });
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('wksp-1');
+      expect(result.stdout).toContain('test-run');
     });
   });
 });

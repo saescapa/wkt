@@ -82,8 +82,8 @@ The `dev:safe` script sets `WKT_HOME` to a temporary directory, preventing accid
 ```bash
 # ALWAYS use dev:safe for manual testing
 bun run dev:safe list
-bun run dev:safe claim my-project
-bun run dev:safe release
+bun run dev:safe create my-project feature/test
+bun run dev:safe clean my-project/test
 
 # Or set WKT_HOME explicitly for a persistent test directory
 WKT_HOME=/tmp/wkt-test bun run dev list
