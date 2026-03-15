@@ -68,13 +68,23 @@ export async function rebaseBranch(workspacePath: string, baseBranch: string): P
 export async function isBranchMerged(bareRepoPath: string, branchName: string, baseBranch: string = 'main'): Promise<boolean> {
   try {
     // Method 1: Check if branch is merged using traditional git branch --merged
-    const result = await executeCommand(['git', 'branch', '--merged', baseBranch], bareRepoPath);
-    const mergedBranches = result.split('\n')
-      .map(line => line.trim().replace(/^\*\s*/, ''))
-      .filter(line => line.length > 0);
+    // Check both local base branch and remote tracking ref to handle:
+    // - Local merges (detected via local baseBranch)
+    // - Remote PR merges (detected via origin/baseBranch after fetch)
+    for (const ref of [baseBranch, `origin/${baseBranch}`]) {
+      try {
+        const result = await executeCommand(['git', 'branch', '--merged', ref], bareRepoPath);
+        const mergedBranches = result.split('\n')
+          .map(line => line.trim().replace(/^\*\s*/, ''))
+          .filter(line => line.length > 0);
 
-    if (mergedBranches.includes(branchName)) {
-      return true;
+        if (mergedBranches.includes(branchName)) {
+          return true;
+        }
+      } catch {
+        // Ref might not exist (e.g., no remote), continue to next
+        logger.debug(`Could not check --merged against '${ref}', skipping`);
+      }
     }
 
     // Method 2: Check for GitHub-style merges (squash merges, merge commits)

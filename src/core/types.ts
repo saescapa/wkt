@@ -154,6 +154,14 @@ export interface CleanCommandOptions extends BaseCommandOptions {
   all?: boolean;
   merged?: boolean;
   olderThan?: string;
+  fetch?: boolean;
+}
+
+export interface MergeCommandOptions extends BaseCommandOptions {
+  squash?: boolean;
+  into?: string;
+  clean?: boolean;
+  project?: string;
 }
 
 export interface ConfigCommandOptions {

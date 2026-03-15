@@ -12,6 +12,7 @@ import {
   getBranchAge,
   getCommitCountAhead,
   getLastCommitInfo,
+  fetchAll,
 } from '../utils/git/index.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import { formatTimeAgo } from '../utils/format.js';
@@ -56,7 +57,7 @@ async function cleanSingleWorkspace(
 ): Promise<void> {
   const allWorkspaces = db.getAllWorkspaces();
   const workspace = allWorkspaces.find(w => w.name === workspaceName);
-  
+
   if (!workspace) {
     console.log(chalk.red(`Workspace '${workspaceName}' not found`));
     return;
@@ -66,6 +67,15 @@ async function cleanSingleWorkspace(
   if (!project) {
     console.log(chalk.red(`Project '${workspace.projectName}' not found`));
     return;
+  }
+
+  // Fetch remote refs for accurate merge detection
+  if (options.merged !== false && options.fetch !== false) {
+    try {
+      await fetchAll(project.bareRepoPath);
+    } catch {
+      // Network issues shouldn't block cleanup
+    }
   }
 
   // Check if workspace should be cleaned based on criteria
@@ -106,6 +116,23 @@ async function cleanAllWorkspaces(
 
   if (allWorkspaces.length === 0) {
     return;
+  }
+
+  // Fetch remote refs for accurate merge detection (once per project)
+  if (options.merged && options.fetch !== false) {
+    const fetchedProjects = new Set<string>();
+    for (const workspace of allWorkspaces) {
+      if (fetchedProjects.has(workspace.projectName)) continue;
+      const project = db.getProject(workspace.projectName);
+      if (project) {
+        try {
+          await fetchAll(project.bareRepoPath);
+        } catch {
+          // Network issues shouldn't block cleanup
+        }
+        fetchedProjects.add(workspace.projectName);
+      }
+    }
   }
 
   // Filter workspaces based on criteria

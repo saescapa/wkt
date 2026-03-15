@@ -11,6 +11,7 @@ import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
 import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
+import { mergeCommand } from './commands/merge.js';
 import { infoCommand } from './commands/info.js';
 import { Logger, logger } from './utils/logger.js';
 import { ErrorHandler } from './utils/errors.js';
@@ -118,7 +119,19 @@ program
   .option('--older-than <duration>', 'Remove workspaces older than duration (e.g., 30d, 2w, 6m, 1y)')
   .option('--force', 'Force removal without confirmation')
   .option('--all', 'Clean all workspaces (overrides --merged default)')
+  .option('--no-fetch', 'Skip fetching remote refs before merge detection')
   .action(cleanCommand);
+
+program
+  .command('merge')
+  .description('Merge a workspace branch into the target branch locally')
+  .argument('[workspace]', 'Workspace to merge (default: current workspace)')
+  .option('--squash', 'Squash all commits into a single merge commit')
+  .option('--into <branch>', 'Target branch (default: project default branch)')
+  .option('--clean', 'Remove the source workspace after a successful merge')
+  .option('-p, --project <name>', 'Specify project (for disambiguation)')
+  .option('--force', 'Merge even if source has uncommitted changes')
+  .action(mergeCommand);
 
 program
   .command('rename')
