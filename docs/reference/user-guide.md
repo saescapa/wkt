@@ -263,6 +263,48 @@ wkt clean auth-system --force
 - `--older-than <duration>` - Remove stale workspaces
 - `--force` - Skip confirmation
 - `--all` - Clean all (overrides --merged)
+- `--no-fetch` - Skip fetching remote refs before merge detection
+
+### `wkt merge`
+
+Merge a workspace branch into the target branch locally.
+
+```bash
+wkt merge [workspace] [options]
+```
+
+**Examples:**
+
+```bash
+# Merge current workspace into main (run from a feature workspace)
+wkt merge
+
+# Merge specific workspace into main
+wkt merge auth-system
+
+# Squash merge into a single commit
+wkt merge auth-system --squash
+
+# Merge and clean up the workspace afterwards
+wkt merge auth-system --clean
+
+# Merge into a different target branch
+wkt merge auth-system --into develop
+```
+
+**Options:**
+- `--squash` - Squash all commits into a single merge commit
+- `--into <branch>` - Target branch (default: project default branch)
+- `--clean` - Remove the source workspace after a successful merge
+- `-p, --project <name>` - Specify project (for disambiguation)
+- `--force` - Merge even if source has uncommitted changes
+
+**Behavior:**
+- From a **feature workspace**: auto-selects the current workspace as the merge source
+- From the **main workspace** or outside any workspace: shows an interactive workspace picker
+- Checks that the target workspace is clean before merging
+- Warns if the source workspace has uncommitted changes (only committed work is merged)
+- On conflict, shows resolution instructions and aborts
 
 ### `wkt rename`
 
@@ -530,6 +572,41 @@ cd ~/.wkt/workspaces/my-project/feature-auth
 git fetch origin
 git rebase origin/main
 git push origin feature/auth --force-with-lease
+```
+
+### Local Merge Workflow
+
+Merge feature branches into main locally without pushing to a remote. Useful for personal projects or when you want to batch changes before deploying.
+
+```bash
+# Work on a feature
+wkt create my-project feature/auth
+cd ~/.wkt/workspaces/my-project/feature-auth
+# make changes, commit...
+
+# Merge locally into main
+wkt merge feature-auth
+
+# Or squash merge for a clean history
+wkt merge feature-auth --squash --clean
+
+# Push to remote whenever you're ready
+cd ~/.wkt/workspaces/my-project/main
+git push origin main
+```
+
+### Remote (PR) Workflow
+
+Use GitHub/GitLab pull requests to merge branches remotely.
+
+```bash
+# Push feature branch and create PR
+cd ~/.wkt/workspaces/my-project/feature-auth
+git push origin feature/auth
+# Create PR, review, merge on GitHub...
+
+# Clean up locally (fetches remote to detect merged PRs)
+wkt clean
 ```
 
 ### Main Branch Protection

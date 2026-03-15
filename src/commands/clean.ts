@@ -70,7 +70,7 @@ async function cleanSingleWorkspace(
   }
 
   // Fetch remote refs for accurate merge detection
-  if (options.merged !== false && options.fetch !== false) {
+  if (options.merged && options.fetch !== false) {
     try {
       await fetchAll(project.bareRepoPath);
     } catch {

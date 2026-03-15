@@ -61,6 +61,11 @@ export async function mergeCommand(
     }
 
     // Step 3: Pre-merge checks
+    if (!existsSync(sourceWorkspace.path)) {
+      console.log(chalk.red(`✗ Source workspace directory missing: ${sourceWorkspace.path}`));
+      return;
+    }
+
     const commitsAhead = await getCommitCountAhead(sourceWorkspace.path, targetBranch);
     if (commitsAhead === 0 && !options.force) {
       console.log(chalk.yellow(`'${sourceWorkspace.branchName}' has no commits ahead of '${targetBranch}'`));
