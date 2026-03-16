@@ -44,9 +44,6 @@ export class Logger {
     if (process.env.WKT_DEBUG === '1' || process.env.WKT_DEBUG === 'true') {
       return 'debug';
     }
-    if (process.env.NODE_ENV === 'development') {
-      return 'debug';
-    }
     return 'info';
   }
 

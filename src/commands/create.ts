@@ -55,7 +55,9 @@ export async function createCommand(
     const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
 
     const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
-    const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+    const workspaceName = options.name
+      ? BranchInference.sanitizeWorkspaceName(options.name, namingStrategy)
+      : BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
 
     const workspaceId = BranchInference.generateWorkspaceId(projectName, workspaceName);
 
@@ -156,7 +158,9 @@ export async function createCommand(
           const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
           const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
           const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
-          const workspaceName = options.name || BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+          const workspaceName = options.name
+      ? BranchInference.sanitizeWorkspaceName(options.name, namingStrategy)
+      : BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
           const workspacePath = join(project.workspacesPath, workspaceName);
 
           if (existsSync(workspacePath)) {

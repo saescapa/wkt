@@ -21,56 +21,43 @@ export async function createWorktree(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    // Handle empty repository case - create orphan branch
+    // Handle empty repository — seed the bare repo with an initial commit,
+    // then retry `git worktree add` so the workspace is a real worktree
+    // (not an independent clone).
     if (errorMessage.includes('not a valid object name') ||
         errorMessage.includes('fatal: not a valid object name') ||
         errorMessage.includes('invalid reference:')) {
-      logger.debug('Detected empty repository, creating initial workspace structure');
+      logger.debug('Detected empty repository, seeding bare repo with initial commit');
 
-      // Create workspace directory
-      await executeCommand(['mkdir', '-p', workspacePath], undefined);
+      const targetBranch = baseBranch || branchName;
 
-      // Initialize workspace as git repository
-      await executeCommand(['git', 'init'], workspacePath);
+      // Create an empty tree and commit using plumbing commands
+      const emptyTree = (await executeCommand(['git', 'hash-object', '-t', 'tree', '/dev/null'], bareRepoPath)).trim();
+      const commitHash = (await executeCommand(
+        ['git', 'commit-tree', emptyTree, '-m', 'Initial commit'],
+        bareRepoPath
+      )).trim();
 
-      // Set up origin remote if the bare repo has one
-      let hasOrigin = false;
-      try {
-        const originUrl = await executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
-        await executeCommand(['git', 'remote', 'add', 'origin', originUrl], workspacePath);
-        hasOrigin = true;
-      } catch {
-        logger.debug('No origin remote in bare repo, skipping remote setup');
-      }
+      // Point the target branch at this commit
+      await executeCommand(['git', 'update-ref', `refs/heads/${targetBranch}`, commitHash], bareRepoPath);
 
-      // Create and checkout the new branch
-      await executeCommand(['git', 'checkout', '-b', branchName], workspacePath);
-
-      // Try to fetch from remote to see if there are any commits
-      if (hasOrigin) {
-        try {
-          await executeCommand(['git', 'fetch', 'origin'], workspacePath);
-          try {
-            await executeCommand(['git', 'merge', `origin/${baseBranch || 'main'}`], workspacePath);
-          } catch {
-            try {
-              await executeCommand(['git', 'merge', 'origin/master'], workspacePath);
-            } catch {
-              logger.debug('No remote branches to merge, creating initial commit');
-              await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
-            }
-          }
-        } catch {
-          logger.debug('No remote refs available, creating initial commit');
-          await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
-        }
+      // Retry the worktree add — this time the ref exists
+      if (baseBranch && branchName !== baseBranch) {
+        await executeCommand(['git', 'worktree', 'add', workspacePath, '-b', branchName, targetBranch], bareRepoPath);
       } else {
-        logger.debug('No remote configured, creating initial commit');
-        await executeCommand(['git', 'commit', '--allow-empty', '-m', 'Initial commit'], workspacePath);
+        await executeCommand(['git', 'worktree', 'add', workspacePath, branchName], bareRepoPath);
       }
     } else {
       throw error;
     }
+  }
+
+  // Ensure worktree is not treated as bare (bare repos with extensions.worktreeConfig
+  // require each worktree to explicitly set core.bare=false in its config.worktree)
+  try {
+    await executeCommand(['git', 'config', '--worktree', 'core.bare', 'false'], workspacePath);
+  } catch (error) {
+    logger.warn(`Could not set core.bare=false in worktree: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Ensure origin remote is properly configured in the worktree

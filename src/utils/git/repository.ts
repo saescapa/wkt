@@ -34,6 +34,22 @@ export async function cloneBareRepository(repoUrl: string, targetPath: string): 
     logger.debug('Origin remote not found, adding it');
     await executeCommand(['git', 'remote', 'add', 'origin', repoUrl], targetPath);
   }
+
+  // git clone --bare stores remote branches as local refs (refs/heads/*) instead
+  // of remote-tracking refs (refs/remotes/origin/*). Set up the standard fetch
+  // refspec and re-fetch so worktrees and getDefaultBranch work correctly.
+  await executeCommand(
+    ['git', 'config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*'],
+    targetPath
+  );
+  try {
+    await withRetry(
+      () => executeCommand(['git', 'fetch', 'origin'], targetPath),
+      `Fetch after bare clone`
+    );
+  } catch {
+    logger.debug('Fetch after bare clone failed (remote may be empty)');
+  }
 }
 
 export async function initBareRepository(targetPath: string): Promise<void> {
@@ -58,13 +74,27 @@ export async function getDefaultBranch(bareRepoPath: string): Promise<string> {
       if (firstBranch) {
         return firstBranch.replace('origin/', '');
       }
-
-      // No remote branches found - this is likely an empty repository
-      logger.debug('No remote branches found, defaulting to main');
-      return 'main';
     } catch (innerError) {
       logger.debug(`Failed to list remote branches: ${innerError instanceof Error ? innerError.message : String(innerError)}`);
-      return 'main';
     }
+
+    // Fallback: check local branches (bare clones without fetch refspec
+    // store remote branches as local refs in refs/heads/*)
+    try {
+      const localResult = await executeCommand(['git', 'branch'], bareRepoPath);
+      const localBranches = localResult.split('\n').map(b => b.replace('*', '').trim()).filter(b => b.length > 0);
+
+      if (localBranches.includes('main')) return 'main';
+      if (localBranches.includes('master')) return 'master';
+
+      if (localBranches.length > 0 && localBranches[0]) {
+        return localBranches[0];
+      }
+    } catch (localError) {
+      logger.debug(`Failed to list local branches: ${localError instanceof Error ? localError.message : String(localError)}`);
+    }
+
+    logger.debug('No branches found, defaulting to main');
+    return 'main';
   }
 }
