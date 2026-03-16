@@ -36,10 +36,18 @@ export async function mergeCommand(
 
     const targetBranch = options.into || project.defaultBranch;
 
-    // Prevent merging main into itself
+    // Prevent merging main into itself (but allow main → feature)
     const mainBranches = [project.defaultBranch, 'main', 'master'];
-    if (mainBranches.some(b => sourceWorkspace.branchName === b)) {
-      console.log(chalk.red(`✗ Cannot merge '${sourceWorkspace.branchName}' — it's a main branch`));
+    const sourceIsMain = mainBranches.some(b => sourceWorkspace.branchName === b);
+    const targetIsMain = mainBranches.some(b => targetBranch === b);
+
+    if (sourceIsMain && targetIsMain) {
+      console.log(chalk.red(`✗ Cannot merge '${sourceWorkspace.branchName}' into '${targetBranch}' — both are main branches`));
+      return;
+    }
+
+    if (sourceIsMain && !options.into) {
+      console.log(chalk.red(`✗ Cannot merge '${sourceWorkspace.branchName}' — use --into <branch> to specify target`));
       return;
     }
 
@@ -150,8 +158,10 @@ export async function mergeCommand(
       throw new GitRepositoryError(`Merge failed: ${msg}`);
     }
 
-    // Step 6: Optional cleanup
-    if (options.clean) {
+    // Step 6: Optional cleanup (skip for main → feature merges)
+    if (sourceIsMain) {
+      console.log(chalk.gray(`\n  git push origin ${targetBranch}          # push when ready`));
+    } else if (options.clean) {
       await cleanupSourceWorkspace(sourceWorkspace, project, dbManager);
     } else {
       console.log(chalk.gray(`\n  wkt clean ${sourceWorkspace.name}     # remove merged workspace`));
@@ -189,6 +199,11 @@ async function resolveSourceWorkspace(
 
     if (!isMain) {
       // In a feature workspace — use it as source
+      return current;
+    }
+
+    // In main workspace with --into: use main as source (merge main → feature)
+    if (options.into) {
       return current;
     }
 

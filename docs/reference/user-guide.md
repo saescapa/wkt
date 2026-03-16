@@ -290,6 +290,9 @@ wkt merge auth-system --clean
 
 # Merge into a different target branch
 wkt merge auth-system --into develop
+
+# Merge main into a feature branch (run from main workspace)
+wkt merge --into feat/bot-prevention
 ```
 
 **Options:**
@@ -301,7 +304,8 @@ wkt merge auth-system --into develop
 
 **Behavior:**
 - From a **feature workspace**: auto-selects the current workspace as the merge source
-- From the **main workspace** or outside any workspace: shows an interactive workspace picker
+- From the **main workspace** with `--into`: merges main into the specified feature branch (does not clean)
+- From the **main workspace** or outside any workspace (without `--into`): shows an interactive workspace picker
 - Checks that the target workspace is clean before merging
 - Warns if the source workspace has uncommitted changes (only committed work is merged)
 - On conflict, shows resolution instructions and aborts
