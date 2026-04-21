@@ -6,6 +6,7 @@
 |----------|-------------|
 | [User Guide](reference/user-guide.md) | Installation, commands, usage examples |
 | [Configuration](reference/configuration.md) | Config file reference |
+| [Agent Usage](reference/agent-usage.md) | Non-interactive mode contract for LLM agents |
 
 ## Development
 

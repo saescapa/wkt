@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import { DatabaseManager } from '../core/database.js';
 import { ErrorHandler } from '../utils/errors.js';
 import { formatTimeAgo } from '../utils/format.js';
@@ -36,6 +37,9 @@ export async function infoCommand(options: InfoCommandOptions = {}): Promise<voi
       if (typeof options.setDescription === 'string') {
         newDescription = options.setDescription;
       } else {
+        if (isNonInteractive()) {
+          requireInput('workspace description', 'Pass the description with the flag: wkt info --set-description "<text>"');
+        }
         // Interactive prompt
         const { description } = await inquirer.prompt([
           {

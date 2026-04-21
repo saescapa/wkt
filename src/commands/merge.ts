@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import { existsSync } from 'fs';
 import type { MergeCommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
@@ -89,6 +90,10 @@ export async function mergeCommand(
       if (sourceStatus.untracked > 0) console.log(chalk.yellow(`   ${sourceStatus.untracked} untracked`));
 
       if (!options.force) {
+        if (isNonInteractive()) {
+          console.log(chalk.yellow('Merge cancelled: uncommitted changes present. Pass --force to proceed anyway.'));
+          return;
+        }
         const { proceed } = await inquirer.prompt([{
           type: 'confirm',
           name: 'proceed',
@@ -231,6 +236,9 @@ async function selectSourceWorkspace(
     if (projects.length === 1 && projects[0]) {
       resolvedProject = projects[0].name;
     } else {
+      if (isNonInteractive()) {
+        requireInput('project selection', `Multiple projects exist (${projects.map(p => p.name).join(', ')}). Pass -p <project>.`);
+      }
       const { selected } = await inquirer.prompt([{
         type: 'list',
         name: 'selected',
@@ -263,6 +271,9 @@ async function selectSourceWorkspace(
     return null;
   }
 
+  if (isNonInteractive()) {
+    requireInput('workspace selection', `Pass the workspace name as an argument: wkt merge <workspace>. Available: ${featureWorkspaces.map(w => w.name).join(', ')}`);
+  }
   const { selected } = await inquirer.prompt([{
     type: 'list',
     name: 'selected',

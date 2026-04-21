@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import { existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import type { RenameCommandOptions } from '../core/types.js';
@@ -19,6 +20,7 @@ import {
   ErrorHandler,
   WorkspaceNotFoundError,
   GitRepositoryError,
+  WKTError,
 } from '../utils/errors.js';
 
 export async function renameCommand(
@@ -60,6 +62,10 @@ export async function renameCommand(
     if (!resolvedName) {
       console.log(chalk.blue(`\nRename workspace: ${workspace.name}`));
       console.log(chalk.gray(`Current branch: ${workspace.branchName}\n`));
+
+      if (isNonInteractive()) {
+        requireInput('new workspace name', 'Pass the new name as an argument: wkt rename <new-name>');
+      }
 
       const { inputName } = await inquirer.prompt([{
         type: 'input',
@@ -116,6 +122,11 @@ export async function renameCommand(
       if (status.untracked > 0) console.log(chalk.yellow(`  - ${status.untracked} untracked files`));
       if (status.conflicted > 0) console.log(chalk.red(`  - ${status.conflicted} conflicted files`));
 
+      if (isNonInteractive()) {
+        console.log(chalk.yellow(`${isRecycle ? 'Recycle' : 'Rename'} cancelled: uncommitted changes present. Pass --force to proceed.`));
+        return;
+      }
+
       const { proceed } = await inquirer.prompt([
         {
           type: 'confirm',
@@ -142,14 +153,18 @@ export async function renameCommand(
       if (commitsDiff.ahead > 0) {
         console.log(chalk.yellow(`\n⚠️  Current branch has ${commitsDiff.ahead} local commit(s)`));
 
-        const { confirmRebase } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'confirmRebase',
-            message: `Rebase these commits onto latest ${baseBranch}?`,
-            default: true,
-          },
-        ]);
+        let confirmRebase = true;
+        if (!isNonInteractive()) {
+          const answer = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'confirmRebase',
+              message: `Rebase these commits onto latest ${baseBranch}?`,
+              default: true,
+            },
+          ]);
+          confirmRebase = answer.confirmRebase;
+        }
 
         if (!confirmRebase) {
           console.log(chalk.yellow('Skipping rebase. Switching to new branch without rebasing.'));
@@ -186,6 +201,13 @@ export async function renameCommand(
 
       if (branchAlreadyExists) {
         console.log(chalk.yellow(`\nBranch '${inferredBranchName}' already exists.`));
+        if (isNonInteractive()) {
+          throw new WKTError(
+            `Branch '${inferredBranchName}' already exists. Pass a different name or delete the existing branch first.`,
+            'BRANCH_EXISTS',
+            true
+          );
+        }
         const { action } = await inquirer.prompt([
           {
             type: 'list',
@@ -242,6 +264,8 @@ export async function renameCommand(
       // Update description if provided, otherwise clear it for fresh start
       if (options.description !== undefined) {
         workspace.description = options.description;
+      } else if (isNonInteractive()) {
+        workspace.description = undefined;
       } else {
         // Prompt to update description for recycled workspace
         const { updateDesc } = await inquirer.prompt([

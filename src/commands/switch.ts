@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import Fuse from 'fuse.js';
 import type { SwitchCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
@@ -190,6 +191,10 @@ async function selectWorkspaceInteractively(
     return undefined;
   }
 
+  if (isNonInteractive()) {
+    requireInput('workspace selection', `Pass a workspace name: wkt switch <workspace>. Available: ${filteredWorkspaces.map(w => w.name).join(', ')}`);
+  }
+
   const choices = filteredWorkspaces.map(workspace => ({
     name: formatWorkspaceChoice(workspace),
     value: workspace,
@@ -209,6 +214,9 @@ async function selectWorkspaceInteractively(
 }
 
 async function selectFromMultipleMatches(matches: Workspace[]): Promise<Workspace | undefined> {
+  if (isNonInteractive()) {
+    requireInput('workspace disambiguation', `Multiple workspaces match. Qualify with project: ${matches.map(m => `${m.projectName}/${m.name}`).join(', ')}. Use -p <project> to narrow.`);
+  }
   const choices = matches.map((workspace, index) => ({
     name: `${index + 1}. ${workspace.projectName}/${workspace.name} (${workspace.branchName})`,
     value: workspace,

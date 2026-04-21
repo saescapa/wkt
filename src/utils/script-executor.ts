@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive } from './interactive.js';
 import type {
   Project,
   Workspace,
@@ -51,7 +52,7 @@ export class SafeScriptExecutor {
     }
 
     // Confirm execution unless --force
-    if (!options.force && !options.confirm) {
+    if (!options.force && !options.confirm && !isNonInteractive()) {
       const { confirm } = await inquirer.prompt([{
         type: 'confirm',
         name: 'confirm',

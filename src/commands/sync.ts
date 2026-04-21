@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive } from '../utils/interactive.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
 import { LocalFilesManager } from '../utils/local-files.js';
@@ -41,7 +42,7 @@ export async function syncCommand(options: SyncOptions = {}): Promise<void> {
   console.log();
 
   // Confirm if not forced
-  if (!options.force && !options.dry) {
+  if (!options.force && !options.dry && !isNonInteractive()) {
     const { confirm } = await inquirer.prompt([{
       type: 'confirm',
       name: 'confirm',

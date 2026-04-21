@@ -13,6 +13,7 @@ import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { mergeCommand } from './commands/merge.js';
 import { infoCommand } from './commands/info.js';
+import { helpCommand } from './commands/help.js';
 import { Logger, logger } from './utils/logger.js';
 import { ErrorHandler } from './utils/errors.js';
 
@@ -42,10 +43,14 @@ program
   .description('A flexible CLI tool for managing multiple project working directories using git worktrees')
   .version('0.1.0')
   .option('--debug', 'Enable debug logging')
+  .option('-y, --yes', 'Non-interactive mode: auto-accept confirmations, fail on required prompts (also via WKT_NON_INTERACTIVE=1)')
   .hook('preAction', (thisCommand) => {
     const opts = thisCommand.opts();
     if (opts.debug) {
       Logger.initialize({ level: 'debug' });
+    }
+    if (opts.yes) {
+      process.env.WKT_NON_INTERACTIVE = '1';
     }
   });
 
@@ -182,6 +187,12 @@ program
   .option('--force', 'Skip confirmation prompts')
   .option('--dry', 'Show what would be synced (dry run)')
   .action(syncCommand);
+
+program
+  .command('help')
+  .description('Show help for specific topics (e.g. `wkt help agent`)')
+  .argument('[topic]', 'Help topic (e.g. agent)')
+  .action(helpCommand);
 
 program.on('command:*', () => {
   console.error(chalk.red(`Invalid command: ${program.args.join(' ')}`));

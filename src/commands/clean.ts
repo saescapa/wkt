@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { existsSync, rmSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import inquirer from 'inquirer';
+import { isNonInteractive } from '../utils/interactive.js';
 import type { CleanCommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
@@ -185,17 +186,27 @@ async function cleanAllWorkspaces(
     };
   });
 
-  const { selectedForCleanup } = await inquirer.prompt([
-    {
-      type: 'checkbox',
-      name: 'selectedForCleanup',
-      message: options.force 
-        ? 'Select workspaces to force clean (use space to toggle, enter to confirm):' 
-        : 'Select workspaces to clean (use space to toggle, enter to confirm):',
-      choices: choices,
-      pageSize: Math.min(10, choices.length),
+  let selectedForCleanup: Workspace[];
+  if (isNonInteractive()) {
+    if (!options.force) {
+      console.log(chalk.yellow('Non-interactive mode: pass --force to clean all matching workspaces without confirmation, or pass a specific workspace name.'));
+      return;
     }
-  ]);
+    selectedForCleanup = workspacesToClean;
+    console.log(chalk.gray(`Non-interactive: cleaning all ${selectedForCleanup.length} workspace(s).`));
+  } else {
+    ({ selectedForCleanup } = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'selectedForCleanup',
+        message: options.force
+          ? 'Select workspaces to force clean (use space to toggle, enter to confirm):'
+          : 'Select workspaces to clean (use space to toggle, enter to confirm):',
+        choices: choices,
+        pageSize: Math.min(10, choices.length),
+      }
+    ]));
+  }
 
   const selectedWorkspaces = selectedForCleanup as Workspace[];
 
@@ -464,6 +475,10 @@ async function handleOrphanedDirectories(
     checked: true
   }));
 
+  if (isNonInteractive()) {
+    console.log(chalk.yellow('Non-interactive mode: skipping orphaned directory cleanup (interactive selection required).'));
+    return;
+  }
   const { selectedOrphans } = await inquirer.prompt([
     {
       type: 'checkbox',

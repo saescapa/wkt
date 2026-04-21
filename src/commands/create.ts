@@ -2,6 +2,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import type { CreateCommandOptions, Workspace, Project } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
@@ -209,6 +210,9 @@ async function selectProjectAndBranch(
     selectedProject = projects[0];
     console.log(chalk.gray(`Project: ${selectedProject.name}`));
   } else {
+    if (isNonInteractive()) {
+      requireInput('project selection', `Multiple projects exist (${projects.map(p => p.name).join(', ')}). Pass the project as the first argument: wkt create <project> <branch>`);
+    }
     const projectChoices = projects.map(p => ({
       name: `${p.name}  ${chalk.gray(p.repositoryUrl)}`,
       value: p,
@@ -232,6 +236,9 @@ async function selectProjectAndBranch(
   }
 
   // Branch name input
+  if (isNonInteractive()) {
+    requireInput('branch name', `Pass the branch name as an argument: wkt create ${selectedProject.name} <branch-name>`);
+  }
   const { branchName } = await inquirer.prompt([{
     type: 'input',
     name: 'branchName',

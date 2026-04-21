@@ -2,6 +2,7 @@ import { join, basename } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import type { InitCommandOptions, Project, Workspace } from '../core/types.js';
 import { ConfigManager } from '../core/config.js';
 import { DatabaseManager } from '../core/database.js';
@@ -93,6 +94,10 @@ export async function initCommand(
           // Interactive mode - prompt for repository URL
           console.log(chalk.blue('\nInitialize new project\n'));
 
+          if (isNonInteractive()) {
+            requireInput('repository URL', 'Pass the repository URL as an argument: wkt init <repository-url>, or use --local for a local-only project.');
+          }
+
           const { inputUrl } = await inquirer.prompt([{
             type: 'input',
             name: 'inputUrl',
@@ -166,7 +171,7 @@ export async function initCommand(
     const globalConfig = configManager.getConfig();
     const availableTemplates = globalConfig.project_templates ? Object.keys(globalConfig.project_templates) : [];
 
-    if (!selectedTemplate && availableTemplates.length > 0) {
+    if (!selectedTemplate && availableTemplates.length > 0 && !isNonInteractive()) {
       const answer = await inquirer.prompt<{ template: string; useTemplate: boolean }>([
         {
           type: 'confirm',
@@ -281,6 +286,9 @@ async function applyTemplateToExistingProject(projectName?: string, templateName
       return;
     }
 
+    if (isNonInteractive()) {
+      requireInput('project selection', `Pass project name as an argument. Available: ${projects.map(p => p.name).join(', ')}`);
+    }
     const answer = await inquirer.prompt<{ project: string }>([
       {
         type: 'list',
@@ -312,6 +320,9 @@ async function applyTemplateToExistingProject(projectName?: string, templateName
 
   let selectedTemplate = templateName;
   if (!selectedTemplate) {
+    if (isNonInteractive()) {
+      requireInput('template selection', `Pass --template <name>. Available: ${availableTemplates.join(', ')}`);
+    }
     const answer = await inquirer.prompt<{ template: string }>([
       {
         type: 'list',
