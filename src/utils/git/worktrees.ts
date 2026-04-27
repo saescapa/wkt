@@ -52,14 +52,6 @@ export async function createWorktree(
     }
   }
 
-  // Ensure worktree is not treated as bare (bare repos with extensions.worktreeConfig
-  // require each worktree to explicitly set core.bare=false in its config.worktree)
-  try {
-    await executeCommand(['git', 'config', '--worktree', 'core.bare', 'false'], workspacePath);
-  } catch (error) {
-    logger.warn(`Could not set core.bare=false in worktree: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
   // Ensure origin remote is properly configured in the worktree
   try {
     const originUrl = await executeCommand(['git', 'remote', 'get-url', 'origin'], bareRepoPath);
