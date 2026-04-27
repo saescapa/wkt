@@ -8,7 +8,6 @@ import { switchCommand } from './commands/switch.js';
 import { listCommand } from './commands/list.js';
 import { cleanCommand } from './commands/clean.js';
 import { configCommand } from './commands/config.js';
-import { syncCommand } from './commands/sync.js';
 import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { mergeCommand } from './commands/merge.js';
@@ -178,16 +177,6 @@ program
   .action((scriptName, workspace, options) => {
     runCommand(scriptName, workspace, options);
   });
-
-program
-  .command('sync')
-  .description('Sync local files to existing workspaces')
-  .option('--project <name>', 'Sync specific project only')
-  .option('--workspace <name>', 'Sync specific workspace only')
-  .option('--all', 'Sync all workspaces without confirmation')
-  .option('--force', 'Skip confirmation prompts')
-  .option('--dry', 'Show what would be synced (dry run)')
-  .action(syncCommand);
 
 program
   .command('shared')

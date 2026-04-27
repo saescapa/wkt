@@ -57,12 +57,6 @@ export class ConfigManager {
           { pattern: '^(feature/.+)$', template: '{}' },
         ],
       },
-      local_files: {
-        shared: [],
-        copied: [],
-        templates: {},
-        workspace_templates: {}
-      },
       scripts: {
         scripts: {},
         allowed_commands: [],

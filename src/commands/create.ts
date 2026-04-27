@@ -14,7 +14,6 @@ import {
   getCommitsDiff,
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
-import { LocalFilesManager } from '../utils/local-files.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
@@ -32,7 +31,6 @@ export async function createCommand(
   try {
     const configManager = new ConfigManager();
     const dbManager = new DatabaseManager();
-    const localFilesManager = new LocalFilesManager();
 
     // Interactive mode if project or branch not provided
     if (!projectName || !branchName) {
@@ -119,12 +117,6 @@ export async function createCommand(
     };
 
     dbManager.addWorkspace(workspace);
-
-    // Setup local files (symlinks and copies)
-    await localFilesManager.setupLocalFiles(project, workspacePath, projectConfig, config, {
-      name: workspaceName,
-      branchName: inferredBranchName
-    });
 
     setupSharedSymlinks(configManager.getProjectSharedPath(projectName), workspacePath);
 

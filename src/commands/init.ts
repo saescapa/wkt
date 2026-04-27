@@ -17,7 +17,6 @@ import {
   getWorkspaceStatus,
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
-import { LocalFilesManager } from '../utils/local-files.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
@@ -211,7 +210,6 @@ export async function initCommand(
     // Create the main workspace automatically
     console.log(chalk.gray(`Creating main workspace...`));
 
-    const localFilesManager = new LocalFilesManager();
     const projectConfig = configManager.getProjectConfig(inferredProjectName);
 
     if (!existsSync(workspacesPath)) {
@@ -239,12 +237,6 @@ export async function initCommand(
     };
 
     dbManager.addWorkspace(workspace);
-
-    // Setup local files (symlinks and copies)
-    await localFilesManager.setupLocalFiles(project, mainWorkspacePath, projectConfig, globalConfig, {
-      name: 'main',
-      branchName: defaultBranch
-    });
 
     const sharedPath = configManager.getProjectSharedPath(inferredProjectName);
     if (!existsSync(sharedPath)) {
