@@ -49,11 +49,11 @@ A project is a git repository managed by WKT. Projects are stored as bare reposi
 
 A workspace is a git worktree - an isolated working directory with its own branch. Multiple workspaces can exist for the same project, allowing parallel development.
 
-### Local Files
+### Shared Directory
 
-Files that should be shared or templated across workspaces:
-- **Shared files** - Symlinked from the main workspace (e.g., `.cursor/rules`)
-- **Copied files** - Templated per workspace (e.g., `.env.local`)
+Each project gets a directory at `~/.wkt/shared/<project>/` that is auto-created on `wkt init`. Every top-level entry inside it is symlinked into each new workspace. Use it for files that should be shared but never committed: `docs.local/`, `.env`, editor configs, agent instructions, etc.
+
+The directory itself can be its own git repo (or git submodule) if you want to version-control its contents independently.
 
 ---
 
@@ -83,7 +83,8 @@ wkt init project-name --apply-template --template my-template
 **What happens:**
 1. Clones the repository as a bare repo to `~/.wkt/projects/`
 2. Creates the main workspace in `~/.wkt/workspaces/<project>/main`
-3. Runs post-creation hooks (if configured)
+3. Creates the shared directory at `~/.wkt/shared/<project>/`
+4. Symlinks any existing entries from the shared directory into the main workspace
 
 **Interactive Mode:**
 
@@ -375,79 +376,31 @@ wkt info --set-description "Working on auth"
 - `--json` - Output as JSON
 - `-d, --set-description [text]` - Set or update description
 
-### `wkt run`
+### `wkt shared`
 
-Execute predefined scripts.
+Print the path to the project's shared directory. Creates the directory if it doesn't yet exist.
 
 ```bash
-wkt run [script-name] [workspace] [options]
+wkt shared [options]
 ```
 
 **Examples:**
 
 ```bash
-# Interactive script selection (autocomplete with fuzzy search)
-wkt run
+# Print shared dir for the current workspace's project
+wkt shared
 
-# Run specific script
-wkt run install-deps
+# cd into it
+cd "$(wkt shared)"
 
-# Run in specific workspace
-wkt run build my-project/feature-auth
-
-# Dry run
-wkt run setup --dry
-
-# List available scripts
-wkt run list
-```
-
-**Interactive Mode:**
-
-When run without arguments, shows an autocomplete prompt:
-- Type to filter scripts with fuzzy matching
-- Scripts grouped by location (Scripts, Workspace, Shortcuts)
-- Arrow keys to navigate, Enter to select
-
-**Options:**
-- `-s, --search <query>` - Filter scripts by fuzzy search
-- `--force` - Skip confirmation
-- `--dry` - Show what would run
-- `--timeout <ms>` - Script timeout
-
-### `wkt sync`
-
-Sync local files to workspaces.
-
-```bash
-wkt sync [options]
-```
-
-**Examples:**
-
-```bash
-# Sync all workspaces (with confirmation)
-wkt sync
-
-# Sync specific project
-wkt sync --project my-project
-
-# Sync specific workspace
-wkt sync --workspace feature-auth
-
-# Sync all without confirmation
-wkt sync --all
-
-# Dry run
-wkt sync --dry
+# Specify a project explicitly
+wkt shared --project my-project
 ```
 
 **Options:**
-- `--project <name>` - Sync specific project
-- `--workspace <name>` - Sync specific workspace
-- `--all` - Sync all without confirmation
-- `--force` - Skip confirmation
-- `--dry` - Show what would be synced
+- `-p, --project <name>` - Project name (default: inferred from current workspace, or the only project)
+
+The shared directory's top-level entries are auto-symlinked into every new workspace at `wkt create` time.
 
 ### `wkt config`
 
@@ -509,45 +462,9 @@ PS1='$(wkt_prompt) %~ $ '
 
 ## Lifecycle Hooks
 
-WKT can run scripts automatically at workspace lifecycle events.
+WKT does not run lifecycle scripts. Use git's built-in `post-checkout` hook — it fires on `git worktree add` (which is what `wkt create` uses) and is shared across every worktree via the bare repo's hooks dir.
 
-### Available Hooks
-
-- `post_create` - After workspace creation
-- `pre_switch` - Before switching away from workspace
-- `post_switch` - After switching to workspace
-- `pre_clean` - Before workspace removal
-- `post_clean` - After workspace removal
-
-### Configuration
-
-In `.wkt.yaml` or `~/.wkt/config.yaml`:
-
-```yaml
-scripts:
-  # Commands allowed to execute (security allowlist)
-  allowed_commands:
-    - "pnpm"
-    - "npm"
-
-  # Script definitions
-  scripts:
-    install-deps:
-      name: "Install Dependencies"
-      command: ["pnpm", "install"]
-      conditions:
-        file_exists: ["package.json"]
-
-  # Lifecycle hooks
-  hooks:
-    post_create:
-      - script: "install-deps"
-    post_switch:
-      - script: "install-deps"
-        optional: true
-```
-
-See [Configuration Reference](configuration.md) for full details.
+See [Post-Checkout Hook Pattern](post-checkout-hook.md) for a copy-pasteable template covering dependency installs, codegen, husky/lefthook integration, and fresh-tree detection.
 
 ---
 
@@ -615,13 +532,13 @@ wkt clean
 
 ### Main Branch Protection
 
-Main workspaces are protected because they contain shared files that other workspaces symlink to.
+Main workspaces are protected from accidental cleanup because they typically reflect the project's default branch.
 
 ```bash
 # This will warn
 wkt clean main
 
-# Force if needed (breaks symlinks in other workspaces)
+# Force if needed
 wkt clean main --force
 ```
 
@@ -649,15 +566,7 @@ Debug mode shows:
 
 ### Broken Symlinks
 
-If shared files show as broken symlinks:
-
-```bash
-# Recreate main workspace
-wkt create my-project main
-
-# Resync all workspaces
-wkt sync --all --project my-project
-```
+If shared files show as broken symlinks, the source in `~/.wkt/shared/<project>/` was likely moved or deleted. Recreate the entry under `wkt shared` and the symlinks resolve again. To force-rebuild symlinks for a workspace, delete the broken links and re-run `wkt create` with `--force`, or remove and recreate the workspace.
 
 ### Repository Locked
 

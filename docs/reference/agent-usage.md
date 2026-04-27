@@ -102,21 +102,13 @@ wkt rename <new-name> [--from <base>] [--no-rebase] [--description "<text>"] [--
 
 `<new-name>` is required. If the new branch already exists, the command fails — pass a different name.
 
-### `wkt run`
+### `wkt shared`
 
 ```
-wkt run <script-name> [workspace] [--force] [--dry]
+wkt shared [-p <project>]
 ```
 
-Script name required. `--force` skips the execution confirmation. Interactive fuzzy-search mode is unavailable non-interactively.
-
-### `wkt sync`
-
-```
-wkt sync [--project <p>|--workspace <w>|--all] [--force] [--dry]
-```
-
-Confirmation is auto-skipped in non-interactive mode.
+Prints the path to the project's shared directory (`~/.wkt/shared/<project>/`). The directory is created on first call. Project is inferred from the current workspace; pass `-p` if running outside a workspace and more than one project is initialized.
 
 ### `wkt config`
 

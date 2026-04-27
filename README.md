@@ -5,9 +5,9 @@ Workspace manager for git repositories. Create isolated development environments
 ## Features
 
 - **Workspaces** - Parallel branches via git worktrees
-- **Local Files** - Shared configs (`.env`, IDE settings) across workspaces
-- **Lifecycle Hooks** - Auto-run scripts on create, switch, clean
+- **Shared Directory** - Per-project untracked files (`.env`, IDE settings, `docs.local/`) auto-symlinked into every workspace
 - **Fuzzy Navigation** - Quick switching with search
+- **Local Merge** - Merge feature branches into main without going through a PR
 
 ## Install
 
@@ -38,9 +38,9 @@ wkt clean                                      # Remove merged branches
 | `list` | List all workspaces |
 | `clean` | Remove merged workspaces |
 | `rename <name>` | Rename/recycle workspace |
+| `merge [workspace]` | Merge a workspace into the target branch locally |
 | `info` | Current workspace details |
-| `run [script]` | Execute configured script |
-| `sync` | Sync local files |
+| `shared` | Print path to project's shared directory |
 | `config` | View/edit configuration |
 
 See `wkt <command> --help` for options.
@@ -59,6 +59,8 @@ wkts() {
 
 - [User Guide](docs/reference/user-guide.md) - Complete usage documentation
 - [Configuration](docs/reference/configuration.md) - Config file reference
+- [Post-Checkout Hook](docs/reference/post-checkout-hook.md) - Lifecycle setup pattern via git
+- [Agent Usage](docs/reference/agent-usage.md) - Non-interactive contract for LLM agents
 - [Architecture](docs/dev/architecture.md) - Codebase overview
 - [Contributing](docs/dev/contributing.md) - Development guide
 

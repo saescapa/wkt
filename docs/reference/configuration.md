@@ -6,9 +6,9 @@ Complete reference for WKT configuration options.
 
 ### Hierarchy (highest to lowest priority)
 
-1. **Workspace config** - `.wkt.yaml` in workspace directory
-2. **Project config** - `~/.wkt/config.yaml` projects section
-3. **Global config** - `~/.wkt/config.yaml`
+1. **Workspace config** — `.wkt.yaml` in workspace directory
+2. **Project config** — `~/.wkt/config.yaml` `projects` section
+3. **Global config** — `~/.wkt/config.yaml`
 
 ### File Locations
 
@@ -16,8 +16,10 @@ Complete reference for WKT configuration options.
 ~/.wkt/
 ├── config.yaml          # Global configuration
 ├── database.json        # Workspace metadata (managed by WKT)
-├── projects/            # Bare repositories
-└── workspaces/          # Worktrees
+├── projects/            # Bare repositories (one dir per project)
+├── workspaces/          # Worktrees (grouped by project)
+└── shared/              # Per-project shared directories
+    └── <project>/       # Top-level entries auto-symlinked into each workspace
 ```
 
 ---
@@ -27,35 +29,29 @@ Complete reference for WKT configuration options.
 `~/.wkt/config.yaml`
 
 ```yaml
-# Local files to sync across workspaces
-local_files:
-  # Symlinked from main workspace (stay synchronized)
-  shared:
-    - ".cursor/rules"
-    - "docs/"
-    - "CLAUDE.md"
-
-  # Copied per workspace (become independent)
-  copied:
-    - ".env.local"
-    - ".vscode/launch.json"
-
-  # Template mappings (source -> target)
-  templates:
-    ".env.local": ".env.example"
-    ".vscode/launch.json": ".vscode/launch.json.template"
+# Filesystem layout
+wkt:
+  workspace_root: "/Users/me/.wkt/workspaces"
+  projects_root: "/Users/me/.wkt/projects"
+  shared_root: "/Users/me/.wkt/shared"
 
 # Git settings
 git:
   default_base: "main"              # Default base branch
   auto_fetch: true                  # Auto fetch before operations
+  auto_rebase: false
   push_on_create: false             # Auto push new branches
 
 # Workspace settings
 workspace:
   naming_strategy: "sanitized"      # sanitized, kebab-case, snake_case
   auto_cleanup: true                # Auto cleanup merged branches
-  max_age_days: 30                  # Auto cleanup after N days
+  max_age_days: 30
+
+# Display
+display:
+  hide_inactive_main_branches: true
+  main_branch_inactive_days: 7
 
 # Branch inference patterns
 inference:
@@ -64,38 +60,6 @@ inference:
       template: 'feature/eng-{}'
     - pattern: '^(feature/.+)$'
       template: '{}'
-    - pattern: '^(bugfix/.+)$'
-      template: '{}'
-
-# Script execution
-scripts:
-  # Security allowlist
-  allowed_commands:
-    - "pnpm"
-    - "npm"
-    - "bun"
-    - "node"
-    - "git"
-    - "docker"
-    - "./scripts/"
-
-  # Predefined scripts
-  scripts:
-    install-deps:
-      name: "Install Dependencies"
-      command: ["pnpm", "install"]
-      conditions:
-        file_exists: ["package.json"]
-      timeout: 300000
-
-  # Lifecycle hooks
-  hooks:
-    post_create:
-      - script: "install-deps"
-
-  # Shortcuts
-  shortcuts:
-    i: "install-deps"
 
 # Project-specific overrides
 projects:
@@ -106,194 +70,42 @@ projects:
       patterns:
         - pattern: '^(\d+)$'
           template: 'feature/PROJ-{}'
+
+# Command aliases
+aliases:
+  ls: list
+  sw: switch
+  rm: clean
 ```
 
 ---
 
-## Local Files
+## Shared Directory
 
-### Shared Files (Symlinked)
+WKT does not configure shared files via YAML. Each project has a directory at `~/.wkt/shared/<project>/`. Every top-level entry inside it is symlinked into each new workspace at the same name.
 
-Files listed under `shared` are symlinked from the main workspace:
+```bash
+# Print the shared dir for the current project
+wkt shared
 
-```yaml
-local_files:
-  shared:
-    - ".cursor/rules"          # Single file
-    - "docs/"                  # Entire directory
-    - ".github/workflows/"     # Nested path
+# Populate it
+cd "$(wkt shared)"
+mkdir docs.local
+echo "X=secret" > .env
+
+# Optional: version-control the shared dir on its own
+cd "$(wkt shared)"
+git init
+git remote add origin git@github.com:me/my-project-shared.git
 ```
 
-**Behavior:**
-- Created as symlinks pointing to main workspace
-- Changes in any workspace reflect everywhere
-- Breaking the main workspace breaks all symlinks
-
-### Copied Files (Templated)
-
-Files listed under `copied` are copied per workspace:
-
-```yaml
-local_files:
-  copied:
-    - ".env.local"
-    - ".vscode/settings.json"
-```
-
-**Behavior:**
-- Copied from main workspace or template
-- Each workspace gets its own independent copy
-- Changes are workspace-specific
-
-### Template Mappings
-
-Specify source templates for copied files:
-
-```yaml
-local_files:
-  templates:
-    ".env.local": ".env.example"
-    ".vscode/launch.json": ".vscode/launch.json.template"
-```
-
-If no template is specified, the file is copied directly from the main workspace.
-
-### Workspace-Specific Templates
-
-Different templates based on workspace/branch patterns:
-
-```yaml
-local_files:
-  workspace_templates:
-    "feature/*":
-      ".env.local": ".env.dev.example"
-
-    "*staging*":
-      ".env.local": ".env.staging.example"
-
-    "hotfix/*":
-      ".env.local":
-        source: ".env.prod.example"
-        variables:
-          debug_mode: "false"
-```
+`.git/`, `.gitignore`, and `.DS_Store` inside the shared dir are skipped (so it can safely be its own git repo). Existing files in a workspace are never overwritten.
 
 ---
 
-## Scripts
+## Lifecycle Hooks
 
-### Script Definition
-
-```yaml
-scripts:
-  scripts:
-    my-script:
-      name: "Human Readable Name"
-      command: ["cmd", "arg1", "arg2"]
-      description: "What this script does"
-      timeout: 60000                    # ms, default: 120000
-      optional: true                    # Don't fail if script fails
-      background: true                  # Run in background
-      conditions:
-        file_exists: ["package.json"]
-        file_missing: ["dist/"]
-        branch_pattern: "^feature/.*"
-      env:
-        MY_VAR: "value"
-```
-
-### Template Variables
-
-Available in script commands:
-
-| Variable | Description |
-|----------|-------------|
-| `{{workspace_name}}` | Current workspace name |
-| `{{branch_name}}` | Current branch name |
-| `{{project_name}}` | Project name |
-| `{{workspace_path}}` | Full workspace path |
-| `{{base_branch}}` | Base branch name |
-
-**Example:**
-
-```yaml
-scripts:
-  scripts:
-    create-db:
-      command: ["pscale", "branch", "create", "mydb", "{{branch_name}}"]
-```
-
-### Conditions
-
-| Condition | Description |
-|-----------|-------------|
-| `file_exists` | Run only if all files exist |
-| `file_missing` | Run only if all files are missing |
-| `branch_pattern` | Run only if branch matches regex |
-
-### Hooks
-
-Automatic script execution at lifecycle events:
-
-```yaml
-scripts:
-  hooks:
-    post_create:
-      - script: "install-deps"
-      - script: "build"
-        conditions:
-          file_missing: ["dist/"]
-
-    pre_switch:
-      - script: "docker-down"
-        optional: true
-
-    post_switch:
-      - script: "docker-up"
-        optional: true
-
-    pre_clean:
-      - script: "cleanup"
-        optional: true
-```
-
-### Workspace-Specific Scripts
-
-Override scripts for specific workspace patterns:
-
-```yaml
-scripts:
-  workspace_scripts:
-    "feature/*":
-      post_create:
-        - script: "install-deps"
-        - script: "start-dev-server"
-      scripts:
-        dev-server:
-          command: ["pnpm", "dev"]
-          background: true
-
-    "hotfix/*":
-      post_create:
-        - script: "install-deps"
-        # No dev server for hotfixes
-```
-
-### Shortcuts
-
-Quick aliases for scripts:
-
-```yaml
-scripts:
-  shortcuts:
-    i: "install-deps"
-    b: "build"
-    t: "test"
-    up: "docker-up"
-    down: "docker-down"
-```
-
-Usage: `wkt run i` runs `install-deps`
+WKT does not run lifecycle scripts. Use git's built-in `post-checkout` hook for setup work. See [Post-Checkout Hook Pattern](post-checkout-hook.md).
 
 ---
 
@@ -322,10 +134,10 @@ inference:
 ```
 
 **Examples with above config:**
+
 - `1234` → `feature/eng-1234`
 - `eng-1234` → `feature/eng-1234`
 - `feature/auth` → `feature/auth`
-- `auth` → `feature/auth` (if no match, prepends `feature/`)
 
 ---
 
@@ -335,6 +147,7 @@ inference:
 git:
   default_base: "main"           # Default branch for new workspaces
   auto_fetch: true               # Fetch before operations
+  auto_rebase: false
   push_on_create: false          # Push branch after creation
 ```
 
@@ -370,7 +183,7 @@ workspace:
 
 ## Project-Specific Configuration
 
-Override any global setting per project:
+Override any global setting per project under the `projects` key:
 
 ```yaml
 projects:
@@ -385,10 +198,6 @@ projects:
       patterns:
         - pattern: '^(\d+)$'
           template: 'feature/PROJ-{}'
-
-    local_files:
-      shared:
-        - "custom-shared-file.md"
 ```
 
 ---
@@ -399,27 +208,19 @@ projects:
 |----------|-------------|
 | `WKT_HOME` | Override WKT base directory (default: `~/.wkt`) |
 | `WKT_DEBUG` | Enable debug logging |
+| `WKT_NON_INTERACTIVE` | Disable interactive prompts (also `--yes`/`-y`) |
 
 ### WKT_HOME
 
-Override the base directory where WKT stores its configuration, database, and workspaces. Useful for:
+Override the base directory where WKT stores its configuration, database, workspaces, and shared dirs. Useful for:
 
-- **Development/testing** - Avoid modifying production data
-- **CI environments** - Use isolated directories per job
-- **Multiple configurations** - Run separate WKT instances
+- **Development/testing** — avoid modifying production data
+- **CI environments** — use isolated directories per job
+- **Multiple configurations** — run separate WKT instances
 
 ```bash
-# Use a custom directory
 WKT_HOME=/tmp/wkt-test wkt list
-
-# Development with isolation (recommended)
 bun run dev:safe    # Automatically uses temp directory
 ```
 
 **Priority:** `WKT_HOME` > `HOME/.wkt` > `os.homedir()/.wkt`
-
----
-
-## Example: Full Configuration
-
-See `.wkt.yaml.example` in the repository for a comprehensive example with all options demonstrated.

@@ -26,8 +26,7 @@ src/
 │   ├── clean.ts          # wkt clean
 │   ├── rename.ts         # wkt rename
 │   ├── info.ts           # wkt info
-│   ├── run.ts            # wkt run
-│   ├── sync.ts           # wkt sync
+│   ├── shared.ts         # wkt shared
 │   └── config.ts         # wkt config
 ├── core/                 # Core abstractions
 │   ├── config.ts         # ConfigManager class
@@ -44,8 +43,7 @@ src/
     │   ├── status.ts     # Status and diff operations
     │   └── network.ts    # Network operations with retry
     ├── branch-inference.ts   # BranchInference class
-    ├── local-files.ts    # LocalFilesManager class
-    ├── script-executor.ts    # SafeScriptExecutor class
+    ├── shared-symlinks.ts    # setupSharedSymlinks for shared-dir → workspace
     ├── validation.ts     # Input validation
     ├── format.ts         # Output formatting
     ├── errors.ts         # WKTError and error classes
@@ -68,8 +66,6 @@ All TypeScript interfaces are defined in `src/core/types.ts`. Key types include:
 | `WorkspaceStatus` | Git status counts (staged, unstaged, untracked, conflicted) |
 | `GlobalConfig` | Full configuration structure |
 | `ProjectConfig` | Project-specific configuration overrides |
-| `ScriptDefinition` | Safe script execution configuration |
-| `ScriptHook` | Lifecycle hook configuration |
 
 > **Note:** Always refer to `src/core/types.ts` for the authoritative type definitions.
 
@@ -159,28 +155,15 @@ Git operations are organized into focused modules with direct function exports:
 
 All functions use debug logging and network operations automatically retry up to 3 times with exponential backoff.
 
-### Local Files (`src/utils/local-files.ts`)
+### Shared Symlinks (`src/utils/shared-symlinks.ts`)
 
-The `LocalFilesManager` class manages shared and copied files across workspaces:
+`setupSharedSymlinks(sharedPath, workspacePath)` reads top-level entries from `~/.wkt/shared/<project>/` and creates relative symlinks at the same name inside the workspace. Existing entries in the workspace are not overwritten. `.git`, `.gitignore`, and `.DS_Store` are skipped so the shared dir can itself be a git repo.
 
-- **Shared files** — Symlinked from the main workspace (stay synchronized)
-- **Copied files** — Templated per workspace (become independent)
+Called from `init.ts` (for the auto-created main workspace) and `create.ts` (for every subsequent workspace).
 
-Key method: `setupLocalFiles(project, workspacePath, projectConfig, globalConfig, workspace)`
+### Lifecycle Hooks
 
-### Script Executor (`src/utils/script-executor.ts`)
-
-The `SafeScriptExecutor` class provides secure script execution with:
-
-- Command allowlisting (only whitelisted commands can run)
-- Timeout enforcement
-- Variable substitution (no shell injection)
-- Condition checking (file_exists, branch_pattern, etc.)
-
-Key methods:
-- `executeScript()` — Run a named script
-- `executePostCreationHooks()` / `executePreSwitchHooks()` / etc. — Lifecycle hooks
-- `createContext()` — Build execution context with template variables
+WKT does not implement lifecycle scripts. Setup work belongs in git's `post-checkout` hook, which fires automatically on `git worktree add`. See [`docs/reference/post-checkout-hook.md`](../reference/post-checkout-hook.md).
 
 ### Branch Inference (`src/utils/branch-inference.ts`)
 
@@ -200,8 +183,6 @@ Custom error classes provide structured error handling:
 | `ProjectNotFoundError` | Project doesn't exist |
 | `WorkspaceNotFoundError` | Workspace doesn't exist |
 | `WorkspaceExistsError` | Workspace already exists |
-| `CommandNotAllowedError` | Script command not in allowlist |
-| `ScriptNotFoundError` | Referenced script doesn't exist |
 | `ConfigurationError` | Invalid configuration |
 
 The `ErrorHandler` class provides consistent error display with helpful hints.
@@ -243,7 +224,6 @@ Automatically retries on network errors like connection timeouts and DNS failure
 
 Shared constants including:
 - Default timeouts and limits
-- Allowed commands list
 - Validation patterns
 - Error and success message templates
 
@@ -271,16 +251,10 @@ Shared constants including:
    ├── git worktree add
    └── Update database
 
-6. Sync local files
-   ├── Create symlinks for shared files
-   └── Copy templates for copied files
+6. Setup shared symlinks
+   └── Symlink top-level entries from ~/.wkt/shared/<project>/
 
-7. Run post_create hooks
-   ├── Validate commands against allowlist
-   ├── Check conditions
-   └── Execute scripts
-
-8. Output result
+7. Output result
    └── Success message with path
 ```
 
