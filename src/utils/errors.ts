@@ -79,22 +79,6 @@ export class GitRepositoryError extends WKTError {
   }
 }
 
-export class CommandNotAllowedError extends WKTError {
-  constructor(command: string) {
-    super(`Command not allowed: ${command}`, 'COMMAND_NOT_ALLOWED', true, [
-      { text: 'Add to allowed_commands in .wkt.yaml' },
-    ]);
-  }
-}
-
-export class ScriptNotFoundError extends WKTError {
-  constructor(scriptName: string) {
-    super(`Script '${scriptName}' not found`, 'SCRIPT_NOT_FOUND', true, [
-      { text: 'List available scripts', command: 'wkt run --list' },
-    ]);
-  }
-}
-
 export class ConfigurationError extends WKTError {
   constructor(message: string) {
     super(message, 'CONFIG_ERROR', true, [

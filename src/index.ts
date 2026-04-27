@@ -8,7 +8,6 @@ import { switchCommand } from './commands/switch.js';
 import { listCommand } from './commands/list.js';
 import { cleanCommand } from './commands/clean.js';
 import { configCommand } from './commands/config.js';
-import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { mergeCommand } from './commands/merge.js';
 import { infoCommand } from './commands/info.js';
@@ -161,22 +160,6 @@ program
   .option('--json', 'Output as JSON')
   .option('-d, --set-description [text]', 'Set or update workspace description (prompts if no text provided)')
   .action(infoCommand);
-
-// Execution Commands
-program.commandsGroup('Execution:');
-
-program
-  .command('run')
-  .description('Run a predefined script in a workspace')
-  .argument('[script-name]', 'Name of the script to run (or "list" to show available scripts). If not provided, shows interactive selection')
-  .argument('[workspace]', 'Workspace identifier (optional, uses current workspace if not specified). Use "." for current workspace')
-  .option('-s, --search <query>', 'Filter scripts by fuzzy search')
-  .option('--force', 'Skip confirmation prompts')
-  .option('--dry', 'Show what would be executed (dry run)')
-  .option('--timeout <ms>', 'Script timeout in milliseconds')
-  .action((scriptName, workspace, options) => {
-    runCommand(scriptName, workspace, options);
-  });
 
 program
   .command('shared')

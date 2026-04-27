@@ -4,9 +4,7 @@ import { isNonInteractive, requireInput } from '../utils/interactive.js';
 import Fuse from 'fuse.js';
 import type { SwitchCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
-import { ConfigManager } from '../core/config.js';
 import { ErrorHandler, WorkspaceNotFoundError, NoWorkspaceError } from '../utils/errors.js';
-import { SafeScriptExecutor } from '../utils/script-executor.js';
 import { formatTimeAgo } from '../utils/format.js';
 
 export async function switchCommand(
@@ -80,36 +78,8 @@ export async function switchCommand(
       return;
     }
 
-    const configManager = new ConfigManager();
-    const globalConfig = configManager.getConfig();
-
-    // Execute pre_switch hooks for the current workspace (teardown)
-    const currentWorkspace = dbManager.getCurrentWorkspaceContext();
-    if (currentWorkspace && currentWorkspace.id !== selectedWorkspace.id) {
-      const currentProject = dbManager.getProject(currentWorkspace.projectName);
-      if (currentProject) {
-        const currentProjectConfig = configManager.getProjectConfig(currentWorkspace.projectName);
-        const scriptConfig = currentProjectConfig.scripts || globalConfig.scripts;
-        if (scriptConfig) {
-          const context = SafeScriptExecutor.createContext(currentWorkspace, currentProject);
-          await SafeScriptExecutor.executePreSwitchHooks(context, scriptConfig, { force: true });
-        }
-      }
-    }
-
     selectedWorkspace.lastUsed = new Date();
     dbManager.updateWorkspace(selectedWorkspace);
-
-    // Execute post_switch hooks for the new workspace (setup)
-    const newProject = dbManager.getProject(selectedWorkspace.projectName);
-    if (newProject) {
-      const newProjectConfig = configManager.getProjectConfig(selectedWorkspace.projectName);
-      const scriptConfig = newProjectConfig.scripts || globalConfig.scripts;
-      if (scriptConfig) {
-        const context = SafeScriptExecutor.createContext(selectedWorkspace, newProject);
-        await SafeScriptExecutor.executePostSwitchHooks(context, scriptConfig, { force: true });
-      }
-    }
 
     if (options.pathOnly) {
       console.log(selectedWorkspace.path);

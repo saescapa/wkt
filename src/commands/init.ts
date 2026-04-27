@@ -18,7 +18,6 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
-import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
   ErrorHandler,
   WKTError,
@@ -210,8 +209,6 @@ export async function initCommand(
     // Create the main workspace automatically
     console.log(chalk.gray(`Creating main workspace...`));
 
-    const projectConfig = configManager.getProjectConfig(inferredProjectName);
-
     if (!existsSync(workspacesPath)) {
       mkdirSync(workspacesPath, { recursive: true });
     }
@@ -243,13 +240,6 @@ export async function initCommand(
       mkdirSync(sharedPath, { recursive: true });
     }
     setupSharedSymlinks(sharedPath, mainWorkspacePath);
-
-    // Execute post-creation hooks
-    const scriptConfig = projectConfig.scripts || globalConfig.scripts;
-    if (scriptConfig) {
-      const context = SafeScriptExecutor.createContext(workspace, project);
-      await SafeScriptExecutor.executePostCreationHooks(context, scriptConfig, {});
-    }
 
     console.log(chalk.green(`✓ Successfully initialized project '${inferredProjectName}'`));
     if (!options.local) {

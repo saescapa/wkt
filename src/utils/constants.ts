@@ -38,16 +38,6 @@ export const DEFAULT_INFERENCE_PATTERNS = [
   { pattern: '^(feature/.+)$', template: '{}' },
 ] as const;
 
-// Default allowed commands for script execution
-export const DEFAULT_ALLOWED_COMMANDS = [
-  'pnpm', 'npm', 'yarn', 'bun',
-  'node', 'tsx', 'ts-node',
-  'git', 'docker', 'docker-compose',
-  'planetscale', 'pscale',
-  'make', 'cmake',
-  './scripts/', '../scripts/', 'scripts/'
-] as const;
-
 // Branch age constants (for merge detection)
 export const BRANCH_AGE_LIMIT_DAYS = 30;
 export const BRANCH_AGE_LIMIT_MS = BRANCH_AGE_LIMIT_DAYS * DURATION_UNITS.d;

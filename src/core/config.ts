@@ -57,13 +57,6 @@ export class ConfigManager {
           { pattern: '^(feature/.+)$', template: '{}' },
         ],
       },
-      scripts: {
-        scripts: {},
-        allowed_commands: [],
-        hooks: {},
-        shortcuts: {},
-        workspace_scripts: {},
-      },
       projects: {},
       aliases: {
         ls: 'list',

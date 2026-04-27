@@ -15,7 +15,6 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
-import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
   ErrorHandler,
   ProjectNotFoundError,
@@ -124,13 +123,6 @@ export async function createCommand(
     console.log(chalk.gray(`  Path: ${workspacePath}`));
     console.log(chalk.gray(`  Branch: ${inferredBranchName}`));
     console.log(chalk.gray(`  Base: ${baseBranch}`));
-
-    // Execute post-creation hooks
-    const scriptConfig = projectConfig.scripts || config.scripts;
-    if (scriptConfig) {
-      const context = SafeScriptExecutor.createContext(workspace, project);
-      await SafeScriptExecutor.executePostCreationHooks(context, scriptConfig, options);
-    }
 
     if (options.checkout !== false) {
       console.log(chalk.blue(`\nTo switch to this workspace:`));
