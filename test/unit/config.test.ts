@@ -91,17 +91,20 @@ projects:
     it('should update and save config', () => {
       const customWorkspaces = join(testEnv.testDir, 'custom', 'workspaces');
       const customProjects = join(testEnv.testDir, 'custom', 'projects');
-      
+      const customShared = join(testEnv.testDir, 'custom', 'shared');
+
       configManager.updateConfig({
         wkt: {
           workspace_root: customWorkspaces,
           projects_root: customProjects,
+          shared_root: customShared,
         },
       });
-      
+
       const config = configManager.getConfig();
       expect(config.wkt.workspace_root).toBe(customWorkspaces);
       expect(config.wkt.projects_root).toBe(customProjects);
+      expect(config.wkt.shared_root).toBe(customShared);
     });
   });
 

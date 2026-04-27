@@ -18,6 +18,7 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
+import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
   ErrorHandler,
@@ -244,6 +245,12 @@ export async function initCommand(
       name: 'main',
       branchName: defaultBranch
     });
+
+    const sharedPath = configManager.getProjectSharedPath(inferredProjectName);
+    if (!existsSync(sharedPath)) {
+      mkdirSync(sharedPath, { recursive: true });
+    }
+    setupSharedSymlinks(sharedPath, mainWorkspacePath);
 
     // Execute post-creation hooks
     const scriptConfig = projectConfig.scripts || globalConfig.scripts;

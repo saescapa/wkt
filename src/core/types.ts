@@ -65,6 +65,7 @@ export interface GlobalConfig {
   wkt: {
     workspace_root: string;
     projects_root: string;
+    shared_root: string;
     default_project?: string;
   };
   workspace: {

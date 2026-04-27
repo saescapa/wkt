@@ -33,6 +33,7 @@ export class ConfigManager {
       wkt: {
         workspace_root: join(baseDir, 'workspaces'),
         projects_root: join(baseDir, 'projects'),
+        shared_root: join(baseDir, 'shared'),
       },
       workspace: {
         naming_strategy: 'sanitized',
@@ -152,6 +153,7 @@ export class ConfigManager {
 
     const workspacesDir = this.getConfig().wkt.workspace_root;
     const projectsDir = this.getConfig().wkt.projects_root;
+    const sharedDir = this.getConfig().wkt.shared_root;
 
     if (!existsSync(workspacesDir)) {
       mkdirSync(workspacesDir, { recursive: true });
@@ -159,6 +161,10 @@ export class ConfigManager {
 
     if (!existsSync(projectsDir)) {
       mkdirSync(projectsDir, { recursive: true });
+    }
+
+    if (!existsSync(sharedDir)) {
+      mkdirSync(sharedDir, { recursive: true });
     }
   }
 
@@ -168,5 +174,13 @@ export class ConfigManager {
 
   getProjectsRoot(): string {
     return this.getConfig().wkt.projects_root;
+  }
+
+  getSharedRoot(): string {
+    return this.getConfig().wkt.shared_root;
+  }
+
+  getProjectSharedPath(projectName: string): string {
+    return join(this.getSharedRoot(), projectName);
   }
 }

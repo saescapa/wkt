@@ -13,6 +13,7 @@ import { runCommand } from './commands/run.js';
 import { renameCommand } from './commands/rename.js';
 import { mergeCommand } from './commands/merge.js';
 import { infoCommand } from './commands/info.js';
+import { sharedCommand } from './commands/shared.js';
 import { helpCommand } from './commands/help.js';
 import { Logger, logger } from './utils/logger.js';
 import { ErrorHandler } from './utils/errors.js';
@@ -187,6 +188,12 @@ program
   .option('--force', 'Skip confirmation prompts')
   .option('--dry', 'Show what would be synced (dry run)')
   .action(syncCommand);
+
+program
+  .command('shared')
+  .description('Print the path to the project\'s shared directory (auto-symlinked into each workspace)')
+  .option('-p, --project <name>', 'Project name (default: inferred from current workspace)')
+  .action(sharedCommand);
 
 program
   .command('help')

@@ -15,6 +15,7 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { LocalFilesManager } from '../utils/local-files.js';
+import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
 import { SafeScriptExecutor } from '../utils/script-executor.js';
 import {
   ErrorHandler,
@@ -124,6 +125,8 @@ export async function createCommand(
       name: workspaceName,
       branchName: inferredBranchName
     });
+
+    setupSharedSymlinks(configManager.getProjectSharedPath(projectName), workspacePath);
 
     console.log(chalk.green(`✓ Successfully created workspace '${workspaceName}'`));
     console.log(chalk.gray(`  Path: ${workspacePath}`));
