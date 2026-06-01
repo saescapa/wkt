@@ -65,124 +65,104 @@ export async function rebaseBranch(workspacePath: string, baseBranch: string): P
   await executeCommand(['git', 'rebase', branchRef], workspacePath);
 }
 
-export async function isBranchMerged(bareRepoPath: string, branchName: string, baseBranch: string = 'main'): Promise<boolean> {
+export type MergeStatus = 'merged' | 'unmerged' | 'unknown';
+
+export interface MergeCheckResult {
+  status: MergeStatus;
+  /** Human-readable explanation, set when status is 'unknown'. */
+  reason?: string;
+}
+
+/**
+ * Resolve the most authoritative ref for the base branch, preferring the
+ * remote tracking ref (kept fresh by `wkt clean`'s fetch) over the local head.
+ * Returns null when neither exists.
+ */
+async function resolveBaseRef(bareRepoPath: string, baseBranch: string): Promise<string | null> {
   try {
-    // Method 1: Check if branch is merged using traditional git branch --merged
-    // Check both local base branch and remote tracking ref to handle:
-    // - Local merges (detected via local baseBranch)
-    // - Remote PR merges (detected via origin/baseBranch after fetch)
-    for (const ref of [baseBranch, `origin/${baseBranch}`]) {
-      try {
-        const result = await executeCommand(['git', 'branch', '--merged', ref], bareRepoPath);
-        const mergedBranches = result.split('\n')
-          .map(line => line.trim().replace(/^\*\s*/, ''))
-          .filter(line => line.length > 0);
+    await executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${baseBranch}`], bareRepoPath);
+    return `origin/${baseBranch}`;
+  } catch {
+    // No remote tracking ref; fall back to the local head.
+  }
 
-        if (mergedBranches.includes(branchName)) {
-          return true;
-        }
-      } catch {
-        // Ref might not exist (e.g., no remote), continue to next
-        logger.debug(`Could not check --merged against '${ref}', skipping`);
-      }
+  try {
+    await executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${baseBranch}`], bareRepoPath);
+    return baseBranch;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Determine whether a branch's work has landed in the base branch.
+ *
+ * Uses two git-native checks, no commit-message heuristics:
+ *   1. Containment — the branch has no commits beyond base. Covers fast-forward
+ *      merges, merge commits, and rebase-onto-base.
+ *   2. Squash detection — synthesize a single squashed commit of the branch on
+ *      top of the merge-base and check whether an equivalent patch already
+ *      exists in base. GitHub computes a squash as the `base...head` diff
+ *      (relative to the merge-base), so the patch-ids match.
+ *
+ * Returns 'unknown' (rather than guessing) when the comparison can't be made —
+ * e.g. the base ref or branch is missing, or there's no shared history.
+ */
+export async function getMergeStatus(
+  bareRepoPath: string,
+  branchName: string,
+  baseBranch: string = 'main'
+): Promise<MergeCheckResult> {
+  const baseRef = await resolveBaseRef(bareRepoPath, baseBranch);
+  if (!baseRef) {
+    return {
+      status: 'unknown',
+      reason: `base branch '${baseBranch}' not found locally or on origin (try fetching)`,
+    };
+  }
+
+  try {
+    await executeCommand(['git', 'rev-parse', '--verify', '--quiet', branchName], bareRepoPath);
+  } catch {
+    return { status: 'unknown', reason: `branch '${branchName}' not found in repository` };
+  }
+
+  // Check 1: containment — zero commits in the branch that aren't already in base.
+  try {
+    const aheadCount = (await executeCommand(
+      ['git', 'rev-list', '--count', `${baseRef}..${branchName}`],
+      bareRepoPath
+    )).trim();
+    if (aheadCount === '0') {
+      return { status: 'merged' };
     }
+  } catch (error) {
+    logger.debug(`Containment check failed: ${error instanceof Error ? error.message : String(error)}`);
+    return { status: 'unknown', reason: `could not compare '${branchName}' against '${baseRef}'` };
+  }
 
-    // Method 2: Check for GitHub-style merges (squash merges, merge commits)
-    const branchParts = branchName.split('/');
-    const searchTerms = [
-      branchName,
-      branchParts[branchParts.length - 1],
-      branchName.replace('/', '\\/'),
-    ];
-
-    for (const term of searchTerms) {
-      try {
-        const mergeCommits = await executeCommand(
-          ['git', 'log', '--oneline', '--all', `--grep=${term}`, `origin/${baseBranch}`, '-n', '5'],
-          bareRepoPath
-        );
-
-        if (mergeCommits.trim().length > 0) {
-          return true;
-        }
-      } catch (error) {
-        logger.debug(`Failed to search for merge commits with term '${term}': ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
-    // Method 2b: Check for recent PR merges and match against branch patterns
-    let prNumberSearch = '';
-    try {
-      const logResult = await executeCommand(
-        ['git', 'log', '--oneline', `origin/${baseBranch}`, '--since=30 days ago'],
+  // Check 2: squash merge — does base already contain an equivalent squashed patch?
+  try {
+    const mergeBase = (await executeCommand(['git', 'merge-base', baseRef, branchName], bareRepoPath)).trim();
+    if (mergeBase) {
+      const tree = (await executeCommand(['git', 'rev-parse', `${branchName}^{tree}`], bareRepoPath)).trim();
+      const squashCommit = (await executeCommand(
+        ['git', 'commit-tree', tree, '-p', mergeBase, '-m', 'wkt-merge-check'],
         bareRepoPath
-      );
-      prNumberSearch = logResult.split('\n').filter(line => line.includes('(#')).join('\n');
-    } catch (error) {
-      logger.debug(`Failed to get PR search results: ${error instanceof Error ? error.message : String(error)}`);
-      prNumberSearch = '';
-    }
-
-    if (prNumberSearch.trim().length > 0 && branchParts.length > 1) {
-      const branchType = branchParts[0]?.toLowerCase();
-
-      if (branchType) {
-        const typePatterns: Record<string, string[]> = {
-          'misc': ['misc', 'miscellaneous'],
-          'feat': ['feat', 'feature'],
-          'fix': ['fix'],
-          'chore': ['chore'],
-        };
-
-        const patterns = typePatterns[branchType] ?? [branchType];
-
-        for (const pattern of patterns) {
-          if (prNumberSearch.toLowerCase().includes(pattern)) {
-            const branchAge = await getBranchAge(bareRepoPath, branchName);
-            if (branchAge && (Date.now() - branchAge.getTime()) < 30 * 24 * 60 * 60 * 1000) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-
-    // Method 3: Check if branch exists on remote
-    try {
-      await executeCommand(['git', 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${branchName}`], bareRepoPath);
-      // Branch still exists on remote, so probably not merged
-      return false;
-    } catch {
-      // Branch doesn't exist on remote anymore - check reflog
-      try {
-        const reflogCheck = await executeCommand(['git', 'reflog', '--all', `--grep=origin/${branchName}`, '-n', '1'], bareRepoPath);
-        if (reflogCheck.trim().length === 0) {
-          // No evidence this branch was ever on remote - it's local-only
-          return false;
-        }
-      } catch (error) {
-        logger.debug(`Failed to check reflog: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
-      }
-
-      // Branch was on remote but now deleted - check if it was likely merged
-      try {
-        const recentCommits = await executeCommand(
-          ['git', 'log', '--oneline', `origin/${baseBranch}`, '--since=30 days ago', '-n', '50'],
-          bareRepoPath
-        );
-
-        const branchSearch = branchName.toLowerCase();
-        return recentCommits.toLowerCase().includes(branchSearch);
-      } catch (error) {
-        logger.debug(`Failed to check recent commits: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
+      )).trim();
+      const cherry = (await executeCommand(['git', 'cherry', baseRef, squashCommit], bareRepoPath)).trim();
+      // A '-' prefix means an equivalent patch is already present in base.
+      if (cherry.split('\n').some(line => line.startsWith('-'))) {
+        return { status: 'merged' };
       }
     }
   } catch (error) {
-    logger.debug(`isBranchMerged failed: ${error instanceof Error ? error.message : String(error)}`);
-    return false;
+    logger.debug(`Squash-merge check failed: ${error instanceof Error ? error.message : String(error)}`);
+    // Containment already established the branch has unique commits; an
+    // inconclusive squash check means we treat it as unmerged below.
   }
+
+  return { status: 'unmerged' };
 }
 
 export async function getBranchAge(bareRepoPath: string, branchName: string): Promise<Date | null> {

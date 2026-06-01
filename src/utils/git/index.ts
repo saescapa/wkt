@@ -6,9 +6,10 @@ export {
   branchExists,
   getLatestBranchReference,
   rebaseBranch,
-  isBranchMerged,
+  getMergeStatus,
   getBranchAge,
 } from './branches.js';
+export type { MergeStatus, MergeCheckResult } from './branches.js';
 export {
   createWorktree,
   removeWorktree,

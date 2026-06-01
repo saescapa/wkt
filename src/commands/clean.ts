@@ -7,7 +7,7 @@ import type { CleanCommandOptions, Workspace, Project } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import {
   parseDuration,
-  isBranchMerged,
+  getMergeStatus,
   removeWorktree,
   getBranchAge,
   getCommitCountAhead,
@@ -269,38 +269,37 @@ async function shouldCleanWorkspace(
 
   // Check if we should only clean merged branches
   if (options.merged) {
-    try {
-      const merged = await isBranchMerged(
-        project.bareRepoPath,
-        workspace.branchName,
-        project.defaultBranch
-      );
+    const mergeCheck = await getMergeStatus(
+      project.bareRepoPath,
+      workspace.branchName,
+      project.defaultBranch
+    );
 
-      if (!merged) {
-        // Gather additional details for unmerged branches
-        const details: CleanCheckResult['details'] = {};
-
-        // Get commit count ahead
-        if (existsSync(workspace.path)) {
-          details.commitsAhead = await getCommitCountAhead(
-            workspace.path,
-            project.defaultBranch
-          );
-          details.lastCommit = await getLastCommitInfo(workspace.path) ?? undefined;
-        }
-
-        return {
-          clean: false,
-          reason: `Unmerged work detected`,
-          canForce: true,
-          details
-        };
-      }
-    } catch {
+    if (mergeCheck.status === 'unknown') {
       return {
         clean: false,
-        reason: `Could not check merge status for '${workspace.branchName}'`,
+        reason: `Could not verify merge status: ${mergeCheck.reason}`,
         canForce: true
+      };
+    }
+
+    if (mergeCheck.status === 'unmerged') {
+      // Gather additional details for unmerged branches
+      const details: CleanCheckResult['details'] = {};
+
+      if (existsSync(workspace.path)) {
+        details.commitsAhead = await getCommitCountAhead(
+          workspace.path,
+          project.defaultBranch
+        );
+        details.lastCommit = await getLastCommitInfo(workspace.path) ?? undefined;
+      }
+
+      return {
+        clean: false,
+        reason: `Unmerged work detected`,
+        canForce: true,
+        details
       };
     }
   }
