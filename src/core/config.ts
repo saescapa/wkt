@@ -80,7 +80,20 @@ export class ConfigManager {
     try {
       const configFile = readFileSync(this.configPath, 'utf-8');
       const parsedConfig = parse(configFile) as Partial<GlobalConfig>;
-      this.config = { ...this.getDefaultConfig(), ...parsedConfig };
+      const defaults = this.getDefaultConfig();
+      // Per-section merge so keys added after a user's config was written
+      // (e.g. wkt.shared_root) are backfilled from defaults rather than left undefined.
+      this.config = {
+        ...defaults,
+        ...parsedConfig,
+        wkt: { ...defaults.wkt, ...parsedConfig.wkt },
+        workspace: { ...defaults.workspace, ...parsedConfig.workspace },
+        git: { ...defaults.git, ...parsedConfig.git },
+        display: { ...defaults.display, ...parsedConfig.display },
+        inference: { ...defaults.inference, ...parsedConfig.inference },
+        projects: { ...defaults.projects, ...parsedConfig.projects },
+        aliases: { ...defaults.aliases, ...parsedConfig.aliases },
+      };
       return this.config;
     } catch (error) {
       console.warn('Error reading config file, using defaults:', error);
