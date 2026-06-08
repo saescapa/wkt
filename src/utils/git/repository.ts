@@ -18,11 +18,22 @@ export async function getBareRepoUrl(repoPath: string): Promise<string> {
   }
 }
 
+// git applies core.bare=true from the shared config to linked worktrees in
+// some code paths — e.g. `git rev-parse --show-toplevel` inside a
+// post-checkout hook fails with "this operation must be run in a work tree",
+// breaking `git worktree add` for repos with husky-style hooks. Disabling the
+// flag is safe: worktree and fetch operations on the repo don't rely on it.
+export async function disableBareFlag(bareRepoPath: string): Promise<void> {
+  await executeCommand(['git', 'config', 'core.bare', 'false'], bareRepoPath);
+}
+
 export async function cloneBareRepository(repoUrl: string, targetPath: string): Promise<void> {
   await withRetry(
     () => executeCommand(['git', 'clone', '--bare', repoUrl, targetPath]),
     `Clone repository ${repoUrl}`
   );
+
+  await disableBareFlag(targetPath);
 
   // Check if origin remote already exists (git clone --bare creates it automatically)
   try {
@@ -54,6 +65,7 @@ export async function cloneBareRepository(repoUrl: string, targetPath: string): 
 
 export async function initBareRepository(targetPath: string): Promise<void> {
   await executeCommand(['git', 'init', '--bare', targetPath]);
+  await disableBareFlag(targetPath);
 }
 
 export async function getDefaultBranch(bareRepoPath: string): Promise<string> {
