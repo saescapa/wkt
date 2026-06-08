@@ -1,0 +1,5 @@
+{
+  "name": "wkt",
+  "description": "Teach Claude to use the wkt CLI to parallelize work across isolated git-worktree workspaces and merge it back.",
+  "version": "0.1.0"
+}

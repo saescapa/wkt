@@ -1,0 +1,13 @@
+{
+  "name": "wkt-marketplace",
+  "owner": {
+    "name": "wkt"
+  },
+  "plugins": [
+    {
+      "name": "wkt",
+      "source": ".",
+      "description": "Teach Claude to use the wkt CLI to parallelize work across isolated git-worktree workspaces and merge it back."
+    }
+  ]
+}

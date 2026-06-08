@@ -460,6 +460,22 @@ PS1='$(wkt_prompt) %~ $ '
 
 ---
 
+## Claude Code Integration
+
+WKT ships a Claude Code plugin so Claude can drive `wkt` to parallelize work
+across worktrees and merge it back. The repo is its own marketplace:
+
+```
+/plugin marketplace add saescapa/wkt
+/plugin install wkt@wkt-marketplace
+```
+
+The bundled `wkt-worktrees` skill becomes available in every project you open.
+See [Claude Code Plugin](claude-code-plugin.md) for details, and
+[Agent Usage](agent-usage.md) for the non-interactive command contract.
+
+---
+
 ## Lifecycle Hooks
 
 WKT does not run lifecycle scripts. Use git's built-in `post-checkout` hook — it fires on `git worktree add` (which is what `wkt create` uses) and is shared across every worktree via the bare repo's hooks dir.
