@@ -38,9 +38,7 @@ Command contract (non-interactive):
 
   wkt rename <new-name> [--from <base>] [--no-rebase] [--description "<text>"] [--force]
 
-  wkt run <script-name> [workspace] --force [--dry]
-
-  wkt sync [--project <p>|--workspace <w>|--all] [--force] [--dry]
+  wkt shared [-p <project>]
 
   wkt config [show|path|debug] [--project <name>|--global]
 
