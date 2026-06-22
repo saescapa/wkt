@@ -108,12 +108,44 @@ happens:
 
 ## Cleanup
 
+`--force` is required non-interactively (it skips the interactive selection),
+but it is also **irreversible** — it deletes the workspace directory. Be 100%
+certain no work is lost before running it:
+
 ```bash
-wkt -y clean --merged --force      # remove workspaces whose branches merged
-wkt -y list --dirty                # audit: any workspace with uncommitted work
+wkt -y list --dirty                # FIRST: any workspace with uncommitted work?
+wkt -y clean --merged --force      # only removes workspaces whose branches merged
 ```
 
-`--force` is required non-interactively (it skips the interactive selection).
+Rules for `--force` clean:
+
+- **Audit with `wkt -y list --dirty` first, every time.** A dirty workspace has
+  uncommitted changes that no merge captured — force-cleaning it loses them
+  permanently. Resolve every dirty workspace (commit + merge, or confirm the
+  changes are genuinely disposable) *before* you clean.
+- **Scope it tightly.** Prefer `--merged` (only branches already merged into the
+  default) over `--all`. Treat `wkt -y clean --all --force` as off-limits unless
+  you have confirmed *every* matching workspace is both clean and merged.
+- **When unsure about one workspace, clean it by name**, not via a bulk match —
+  act on exactly what you intend, nothing more.
+- There is no undo. Uncommitted or unmerged work cannot be recovered once the
+  directory is gone. Any doubt → stop and commit/merge first.
+
+## Starting the next task from a fresh base
+
+A new workspace is only as current as the branch it forks from. After finishing
+a task, bring the default branch up to date **before** branching the next one,
+so new work never starts from stale history:
+
+- **Preferred:** merge the finished task into the default branch first
+  (`wkt -y merge <workspace> --clean`), then
+  `wkt -y create <project> <new-branch>` — the new workspace forks from the
+  now-updated default.
+- **If you reuse a workspace** instead of creating a fresh one, reset it to the
+  current default first (e.g. `git fetch origin && git reset --hard
+  origin/<default>`) so it carries no leftover state from the previous task.
+
+Either way the goal is the same: every task starts from a clean, current base.
 
 ## Quick reference
 
