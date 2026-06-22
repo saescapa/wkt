@@ -160,3 +160,9 @@ export interface RenameCommandOptions extends BaseCommandOptions {
   description?: string;
 }
 
+export interface ReconcileCommandOptions {
+  project?: string;
+  apply?: boolean;
+  force?: boolean;
+}
+

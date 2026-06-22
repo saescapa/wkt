@@ -11,6 +11,7 @@ import { configCommand } from './commands/config.js';
 import { renameCommand } from './commands/rename.js';
 import { mergeCommand } from './commands/merge.js';
 import { infoCommand } from './commands/info.js';
+import { reconcileCommand } from './commands/reconcile.js';
 import { sharedCommand } from './commands/shared.js';
 import { helpCommand } from './commands/help.js';
 import { Logger, logger } from './utils/logger.js';
@@ -147,6 +148,14 @@ program
   .option('--description <text>', 'Update workspace description')
   .option('--force', 'Force rename even if working tree is dirty')
   .action(renameCommand);
+
+program
+  .command('reconcile')
+  .description('Detect and fix drift between git worktrees and the wkt database')
+  .option('-p, --project <name>', 'Reconcile a single project (default: all)')
+  .option('--apply', 'Apply database fixes (default: dry-run report only)')
+  .option('--force', 'Skip the confirmation prompt when applying')
+  .action(reconcileCommand);
 
 // Workspace Info Commands
 program.commandsGroup('Workspace Info:');

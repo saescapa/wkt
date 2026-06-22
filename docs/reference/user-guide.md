@@ -345,6 +345,52 @@ wkt rename feature/new-name --description "Updated feature"
 - `--description <text>` - Update description
 - `--force` - Force rename even if dirty
 
+### `wkt reconcile`
+
+Detect and fix drift between git's worktrees and the wkt database. Useful when a
+worktree was created or modified outside wkt — e.g. a raw `git worktree add`, a
+branch renamed with `git branch -m`, or a workspace directory deleted by hand —
+which leaves it invisible to `wkt list` / `wkt switch`.
+
+Runs as a **dry-run report by default**; pass `--apply` to write the fixes.
+
+```bash
+wkt reconcile [options]
+```
+
+**Examples:**
+
+```bash
+# Report drift across all projects (no changes)
+wkt reconcile
+
+# Scope to a single project
+wkt reconcile -p my-project
+
+# Apply the database fixes (prompts to confirm)
+wkt reconcile --apply
+
+# Apply without the confirmation prompt
+wkt reconcile --apply --force
+```
+
+**Options:**
+- `-p, --project <name>` - Reconcile a single project (default: all)
+- `--apply` - Apply database fixes (default: dry-run report only)
+- `--force` - Skip the confirmation prompt when applying
+
+**What it detects:**
+- `adopt` — git has a workspace-level worktree wkt never recorded → adds a database entry
+- `branch-drift` — the database and git disagree on the checked-out branch → updates the database
+- `dead` — a database entry whose worktree directory is gone → removes the entry
+- `stale-git` — git references a worktree directory that no longer exists → suggests `git worktree prune`
+- `broken-link` — a directory exists but git no longer lists it as a worktree → suggests `git worktree repair`
+
+**Behavior:**
+- Only `adopt`, `branch-drift`, and `dead` are fixed automatically (database-only changes)
+- `stale-git` and `broken-link` are reported with the exact git command to run — wkt never touches git plumbing for you
+- Nested worktrees that aren't direct children of the project's workspaces directory (e.g. an agent's isolated worktrees) are reported as `foreign` and ignored
+
 ### `wkt info`
 
 Show current workspace information.
