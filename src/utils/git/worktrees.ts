@@ -1,6 +1,5 @@
 import { executeCommand } from './command.js';
 import { branchExists, getLatestBranchReference, getCurrentBranch } from './branches.js';
-import { disableBareFlag } from './repository.js';
 import { logger } from '../logger.js';
 
 export async function createWorktree(
@@ -9,10 +8,6 @@ export async function createWorktree(
   branchName: string,
   baseBranch?: string
 ): Promise<void> {
-  // Self-heal repos initialized before core.bare was disabled at init time —
-  // a lingering true value breaks post-checkout hooks during worktree add.
-  await disableBareFlag(bareRepoPath);
-
   const branchExistsResult = await branchExists(bareRepoPath, branchName);
 
   try {
@@ -134,9 +129,6 @@ export async function createDetachedWorktree(
   workspacePath: string,
   trackingBranch: string
 ): Promise<string> {
-  // Self-heal repos initialized before core.bare was disabled at init time
-  await disableBareFlag(bareRepoPath);
-
   // Get the latest reference for the tracking branch
   const branchRef = await getLatestBranchReference(bareRepoPath, trackingBranch);
 

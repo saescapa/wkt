@@ -107,7 +107,8 @@ describe('WKT CLI', () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toContain('Usage: wkt');
-      expect(result.stdout).toContain('Commands:');
+      // Commands are shown under grouped headings (Setup:, Workspace Management:, ...)
+      expect(result.stdout).toContain('Workspace Management:');
     });
 
     it('should handle --version flag', async () => {
