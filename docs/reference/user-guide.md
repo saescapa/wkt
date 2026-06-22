@@ -294,12 +294,16 @@ wkt merge auth-system --into develop
 
 # Merge main into a feature branch (run from main workspace)
 wkt merge --into feat/bot-prevention
+
+# Rebase a feature onto its base branch instead of merging
+wkt merge --into auth-system --rebase   # or, from inside the feature: wkt merge --rebase
 ```
 
 **Options:**
 - `--squash` - Squash all commits into a single merge commit
 - `--into <branch>` - Target branch (default: project default branch)
 - `--clean` - Remove the source workspace after a successful merge
+- `--rebase` - Rebase the feature onto its base branch instead of merging
 - `-p, --project <name>` - Specify project (for disambiguation)
 - `--force` - Merge even if source has uncommitted changes
 
@@ -310,6 +314,10 @@ wkt merge --into feat/bot-prevention
 - Checks that the target workspace is clean before merging
 - Warns if the source workspace has uncommitted changes (only committed work is merged)
 - On conflict, shows resolution instructions and aborts
+- After merging a branch **into the default branch**, any workspace stacked on that branch (its base was the merged branch) is automatically re-pointed to the default branch
+- With `--rebase`, replays the named feature onto its recorded base branch (default branch unless created with `--from`), updating its ahead/behind counts; on conflict it leaves the rebase in progress with resolution instructions
+
+**Stacked workspaces:** a workspace created with `--from <branch>` is *stacked* on that branch — `wkt list` tags it `↳stacked` and shows its commits ahead/behind its base. When the base branch later merges into the default branch, `wkt merge` re-points the stack to the default branch; run `wkt merge --into <name> --rebase` to replay it onto the updated base.
 
 ### `wkt rename`
 

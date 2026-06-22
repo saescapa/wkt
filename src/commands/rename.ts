@@ -14,6 +14,7 @@ import {
   moveWorktree,
   getWorkspaceStatus,
   getCommitsDiff,
+  normalizeBaseBranch,
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import {
@@ -144,7 +145,7 @@ export async function renameCommand(
 
     if (isRecycle) {
       // RECYCLE MODE: Full workflow with rebase and new branch creation
-      const baseBranch = options.from || project.defaultBranch;
+      const baseBranch = normalizeBaseBranch(options.from || project.defaultBranch);
 
       console.log(chalk.blue(`\nFetching latest changes from ${baseBranch}...`));
       await fetchAll(project.bareRepoPath);

@@ -138,6 +138,7 @@ export interface MergeCommandOptions extends BaseCommandOptions {
   squash?: boolean;
   into?: string;
   clean?: boolean;
+  rebase?: boolean;
   project?: string;
 }
 

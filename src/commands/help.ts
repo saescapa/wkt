@@ -32,7 +32,7 @@ Command contract (non-interactive):
   wkt info [--json|--name-only|--branch-only|--description-only]
   wkt info --set-description "<text>"
 
-  wkt merge <workspace> [-p <project>] [--into <branch>] [--squash] [--clean] [--force]
+  wkt merge <workspace> [-p <project>] [--into <branch>] [--squash] [--clean] [--rebase] [--force]
 
   wkt clean [workspace] --force [--merged|--older-than <dur>|--all]
 

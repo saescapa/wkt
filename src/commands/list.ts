@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import type { ListCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
+import { normalizeBaseBranch } from '../utils/git/index.js';
 import { formatTimeAgo } from '../utils/format.js';
 
 export async function listCommand(options: ListCommandOptions = {}): Promise<void> {
@@ -124,10 +125,14 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
+  const defaultBranches = new Map(
+    dbManager.getAllProjects().map(p => [p.name, p.defaultBranch])
+  );
+
   if (options.groupBy === 'project' || !options.groupBy) {
-    displayGroupedByProject(activeWorkspaces, currentWorkspace, options.details);
+    displayGroupedByProject(activeWorkspaces, defaultBranches, currentWorkspace, options.details);
   } else {
-    displayFlat(activeWorkspaces, currentWorkspace, options.details);
+    displayFlat(activeWorkspaces, defaultBranches, currentWorkspace, options.details);
   }
 
   // Show inactive workspaces in separate section (compact format)
@@ -143,16 +148,17 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
   // Show legend
   console.log();
   console.log(chalk.dim('─'.repeat(40)));
-  console.log(chalk.dim(`${chalk.green('●')} active  ${chalk.blue('○')} workspace  ${chalk.yellow('◐')} dirty  ${chalk.red('✗')} conflict`));
+  console.log(chalk.dim(`${chalk.green('●')} active  ${chalk.blue('○')} workspace  ${chalk.yellow('◐')} dirty  ${chalk.red('✗')} conflict  ${chalk.magenta('↳stacked')} forked off a non-default branch`));
 }
 
-function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
+function displayGroupedByProject(workspaces: Workspace[], defaultBranches: Map<string, string>, currentWorkspace?: Workspace, showDetails?: boolean): void {
   const projectGroups = groupWorkspacesByProject(workspaces);
 
   Object.entries(projectGroups).forEach(([projectName, projectWorkspaces]) => {
     console.log(chalk.bold(`${projectName}/`));
 
     const branchGroups = groupByBaseBranch(projectWorkspaces);
+    const defaultBranch = defaultBranches.get(projectName);
 
     Object.entries(branchGroups).forEach(([branchName, branchWorkspaces]) => {
       console.log(chalk.dim(`  ${branchName}:`));
@@ -162,7 +168,7 @@ function displayGroupedByProject(workspaces: Workspace[], currentWorkspace?: Wor
         const connector = isLast ? '└─' : '├─';
         const isCurrent = currentWorkspace?.id === workspace.id;
 
-        console.log(formatWorkspace(workspace, `    ${connector} `, isCurrent, showDetails));
+        console.log(formatWorkspace(workspace, `    ${connector} `, isCurrent, showDetails, false, defaultBranch));
       });
     });
 
@@ -174,10 +180,11 @@ function groupByBaseBranch(workspaces: Workspace[]): Record<string, Workspace[]>
   const groups: Record<string, Workspace[]> = {};
 
   for (const ws of workspaces) {
-    if (!groups[ws.baseBranch]) {
-      groups[ws.baseBranch] = [];
+    const base = normalizeBaseBranch(ws.baseBranch);
+    if (!groups[base]) {
+      groups[base] = [];
     }
-    groups[ws.baseBranch]!.push(ws);
+    groups[base]!.push(ws);
   }
 
   for (const group of Object.values(groups)) {
@@ -187,7 +194,7 @@ function groupByBaseBranch(workspaces: Workspace[]): Record<string, Workspace[]>
   return groups;
 }
 
-function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, showDetails?: boolean): void {
+function displayFlat(workspaces: Workspace[], defaultBranches: Map<string, string>, currentWorkspace?: Workspace, showDetails?: boolean): void {
   workspaces
     .sort((a, b) => b.lastUsed.getTime() - a.lastUsed.getTime())
     .forEach((workspace, index) => {
@@ -195,11 +202,17 @@ function displayFlat(workspaces: Workspace[], currentWorkspace?: Workspace, show
       const connector = isLast ? '└─' : '├─';
       const isCurrent = currentWorkspace?.id === workspace.id;
 
-      console.log(formatWorkspace(workspace, `${connector} `, isCurrent, showDetails, true));
+      console.log(formatWorkspace(workspace, `${connector} `, isCurrent, showDetails, true, defaultBranches.get(workspace.projectName)));
     });
 }
 
-function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolean, showDetails?: boolean, includeProject?: boolean): string {
+function isStackedWorkspace(workspace: Workspace, defaultBranch?: string): boolean {
+  if (!defaultBranch) return false;
+  const base = normalizeBaseBranch(workspace.baseBranch);
+  return base !== defaultBranch && workspace.branchName !== defaultBranch;
+}
+
+function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolean, showDetails?: boolean, includeProject?: boolean, defaultBranch?: string): string {
   const modeIcon = getModeIcon(isCurrent);
   const dirtyIndicator = getDirtyIndicator(workspace);
   const statusText = getStatusText(workspace);
@@ -235,6 +248,14 @@ function formatWorkspace(workspace: Workspace, prefix: string, isCurrent: boolea
     const modeLabel = getModeLabel(isCurrent);
     if (modeLabel) {
       line += ` ${chalk.gray(modeLabel)}`;
+    }
+    if (isStackedWorkspace(workspace, defaultBranch)) {
+      line += ` ${chalk.magenta('↳stacked')}`;
+      const ahead = workspace.commitsAhead || 0;
+      const behind = workspace.commitsBehind || 0;
+      if (ahead || behind) {
+        line += ` ${chalk.green(`+${ahead}`)}/${chalk.red(`-${behind}`)}`;
+      }
     }
     if (workspace.description) {
       line += ` ${chalk.dim(`- ${workspace.description}`)}`;

@@ -129,11 +129,12 @@ program
 
 program
   .command('merge')
-  .description('Merge a workspace branch into the target branch locally')
+  .description('Merge a workspace branch into the target branch, or rebase it onto its base, locally')
   .argument('[workspace]', 'Workspace to merge (default: current workspace)')
   .option('--squash', 'Squash all commits into a single merge commit')
   .option('--into <branch>', 'Target branch (default: project default branch)')
   .option('--clean', 'Remove the source workspace after a successful merge')
+  .option('--rebase', 'Rebase the feature onto its base branch instead of merging')
   .option('-p, --project <name>', 'Specify project (for disambiguation)')
   .option('--force', 'Merge even if source has uncommitted changes')
   .action(mergeCommand);

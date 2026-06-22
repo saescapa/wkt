@@ -5,6 +5,7 @@ export {
   getCurrentBranch,
   branchExists,
   getLatestBranchReference,
+  normalizeBaseBranch,
   rebaseBranch,
   getMergeStatus,
   getBranchAge,

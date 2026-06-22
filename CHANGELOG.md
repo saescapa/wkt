@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `wkt merge --rebase` to replay a feature workspace onto its recorded base branch instead of merging
+- `wkt list` now tags stacked workspaces (base ≠ project default) with `↳stacked` and their commits ahead/behind their base
 - Interactive mode for bare commands (`wkt create`, `wkt rename`, `wkt init`, `wkt run`)
 - Autocomplete search with fuzzy filtering for `wkt run` script selection
 - Grouped script display by location (Scripts, Workspace, Shortcuts)
@@ -18,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dev:safe` script for safe manual testing in isolated environment
 
 ### Changed
+- Merging a branch into the default branch now re-points workspaces stacked on it back to the default branch
+- Base branches are normalized (a leading `origin/` is stripped) when stored and grouped, so `origin/main` and `main` no longer split into separate `wkt list` groups
 - Command arguments are now optional with interactive prompts as fallback
 - `wkt list` output now groups workspaces with tree connectors (├─ └─)
 

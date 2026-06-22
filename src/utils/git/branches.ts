@@ -1,6 +1,15 @@
 import { executeCommand } from './command.js';
 import { logger } from '../logger.js';
 
+/**
+ * Collapse a remote-tracking base ref to its local branch name so that
+ * `origin/main` and `main` are treated as the same base everywhere (grouping,
+ * storage, stacked-branch comparisons).
+ */
+export function normalizeBaseBranch(branch: string): string {
+  return branch.replace(/^origin\//, '');
+}
+
 export async function getCurrentBranch(workspacePath: string): Promise<string> {
   try {
     const result = await executeCommand(['git', 'branch', '--show-current'], workspacePath);

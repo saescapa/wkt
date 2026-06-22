@@ -7,8 +7,12 @@ import { DatabaseManager } from '../core/database.js';
 import {
   executeCommand,
   getWorkspaceStatus,
+  getCommitsDiff,
   getCommitCountAhead,
   removeWorktree,
+  rebaseBranch,
+  fetchAll,
+  normalizeBaseBranch,
 } from '../utils/git/index.js';
 import {
   ErrorHandler,
@@ -22,6 +26,11 @@ export async function mergeCommand(
 ): Promise<void> {
   try {
     const dbManager = new DatabaseManager();
+
+    if (options.rebase) {
+      await rebaseFeatureCommand(dbManager, workspace, options);
+      return;
+    }
 
     // Step 1: Determine the source workspace
     const sourceWorkspace = await resolveSourceWorkspace(dbManager, workspace, options);
@@ -163,7 +172,12 @@ export async function mergeCommand(
       throw new GitRepositoryError(`Merge failed: ${msg}`);
     }
 
-    // Step 6: Optional cleanup (skip for main → feature merges)
+    // Step 6: Re-point workspaces stacked on the just-merged branch.
+    if (!sourceIsMain && targetBranch === project.defaultBranch) {
+      await repointStackedChildren(dbManager, project, sourceWorkspace);
+    }
+
+    // Step 7: Optional cleanup (skip for main → feature merges)
     if (sourceIsMain) {
       console.log(chalk.gray(`\n  git push origin ${targetBranch}          # push when ready`));
     } else if (options.clean) {
@@ -291,6 +305,148 @@ async function selectSourceWorkspace(
   }]);
 
   return selected;
+}
+
+function isMainBranch(workspace: Workspace, project?: Project): boolean {
+  const mainBranches = [project?.defaultBranch, 'main', 'master'].filter(Boolean);
+  return mainBranches.some(b => workspace.branchName === b || workspace.name === b);
+}
+
+async function resolveRebaseFeature(
+  dbManager: DatabaseManager,
+  workspace: string | undefined,
+  options: MergeCommandOptions
+): Promise<Workspace | null> {
+  // `--into <X> --rebase` names the feature to rebase (mirrors the merge CLI).
+  const target = options.into || workspace;
+  if (target) {
+    const allWorkspaces = dbManager.getAllWorkspaces();
+    const found = allWorkspaces.find(w => w.name === target || w.branchName === target);
+    if (!found) {
+      throw new WorkspaceNotFoundError(target, allWorkspaces.map(w => w.name));
+    }
+    return found;
+  }
+
+  // No explicit feature: use the current workspace if it's a feature branch.
+  const current = dbManager.getCurrentWorkspaceContext();
+  if (current && !isMainBranch(current, dbManager.getProject(current.projectName))) {
+    return current;
+  }
+
+  // Otherwise fall back to interactive selection.
+  return selectSourceWorkspace(dbManager, options.project ?? current?.projectName);
+}
+
+async function rebaseFeatureCommand(
+  dbManager: DatabaseManager,
+  workspace: string | undefined,
+  options: MergeCommandOptions
+): Promise<void> {
+  const feature = await resolveRebaseFeature(dbManager, workspace, options);
+  if (!feature) {
+    console.log(chalk.yellow('Rebase cancelled'));
+    return;
+  }
+
+  const project = dbManager.getProject(feature.projectName);
+  if (!project) {
+    throw new Error(`Project '${feature.projectName}' not found`);
+  }
+
+  const base = normalizeBaseBranch(feature.baseBranch || project.defaultBranch);
+
+  if (base === feature.branchName) {
+    console.log(chalk.red(`✗ '${feature.name}' is its own base ('${base}') — nothing to rebase onto`));
+    return;
+  }
+
+  if (!existsSync(feature.path)) {
+    console.log(chalk.red(`✗ Workspace directory missing: ${feature.path}`));
+    return;
+  }
+
+  const status = await getWorkspaceStatus(feature.path);
+  if (!status.clean) {
+    console.log(chalk.red(`✗ '${feature.name}' has uncommitted changes — commit or stash before rebasing`));
+    console.log(chalk.gray(`   ${feature.path}`));
+    return;
+  }
+
+  await fetchAll(project.bareRepoPath);
+
+  const before = await getCommitsDiff(feature.path, base);
+  if (before.behind === 0 && !options.force) {
+    console.log(chalk.green(`✓ '${feature.name}' is already up to date with '${base}'`));
+    return;
+  }
+
+  console.log(chalk.blue(`\nRebasing onto ${base}:`));
+  console.log(chalk.gray(`  ${feature.branchName} onto ${base}`));
+  console.log(chalk.gray(`  replaying over ${before.behind} new commit${before.behind === 1 ? '' : 's'}`));
+
+  try {
+    await rebaseBranch(feature.path, base);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.toLowerCase().includes('conflict')) {
+      console.log(chalk.red(`\n✗ Rebase conflicts detected`));
+      console.log(chalk.gray(`\nResolve in: ${feature.path}`));
+      console.log(chalk.gray(`  cd "${feature.path}"`));
+      console.log(chalk.gray(`  # resolve conflicts, then: git rebase --continue`));
+      console.log(chalk.gray(`  # or abort: git rebase --abort`));
+      return;
+    }
+    throw new GitRepositoryError(`Rebase failed: ${msg}`);
+  }
+
+  const after = await getCommitsDiff(feature.path, base);
+  feature.status = await getWorkspaceStatus(feature.path);
+  feature.baseBranch = base;
+  feature.commitsAhead = after.ahead;
+  feature.commitsBehind = after.behind;
+  feature.lastUsed = new Date();
+  dbManager.updateWorkspace(feature);
+
+  console.log(chalk.green(`\n✓ Rebased ${feature.branchName} onto ${base}`));
+  console.log(chalk.gray(`  +${after.ahead} / -${after.behind}`));
+}
+
+async function repointStackedChildren(
+  dbManager: DatabaseManager,
+  project: Project,
+  source: Workspace
+): Promise<void> {
+  const merged = normalizeBaseBranch(source.branchName);
+  const children = dbManager
+    .getWorkspacesByProject(project.name)
+    .filter(w => w.id !== source.id && normalizeBaseBranch(w.baseBranch) === merged);
+
+  if (children.length === 0) {
+    return;
+  }
+
+  for (const child of children) {
+    child.baseBranch = project.defaultBranch;
+    if (existsSync(child.path)) {
+      const diff = await getCommitsDiff(child.path, project.defaultBranch);
+      child.commitsAhead = diff.ahead;
+      child.commitsBehind = diff.behind;
+    }
+    dbManager.updateWorkspace(child);
+  }
+
+  console.log(
+    chalk.blue(
+      `\n↳ Re-pointed ${children.length} stacked workspace${children.length === 1 ? '' : 's'} to ${project.defaultBranch}:`
+    )
+  );
+  for (const child of children) {
+    console.log(chalk.gray(`  ${child.name}  base: ${merged} → ${project.defaultBranch}`));
+  }
+  console.log(
+    chalk.gray(`  (rebase to pick up the changes: wkt merge --into <name> --rebase)`)
+  );
 }
 
 async function cleanupSourceWorkspace(

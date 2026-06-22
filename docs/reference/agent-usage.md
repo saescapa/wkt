@@ -81,10 +81,12 @@ wkt info --set-description "<text>" # must pass text non-interactively
 ### `wkt merge`
 
 ```
-wkt merge <workspace> [-p <project>] [--into <branch>] [--squash] [--clean] [--force]
+wkt merge <workspace> [-p <project>] [--into <branch>] [--squash] [--clean] [--rebase] [--force]
 ```
 
 Workspace name required when not running from within a workspace. If the source has uncommitted changes, the merge cancels unless `--force` is passed.
+
+Merging a branch into the default branch auto-re-points any workspace stacked on it (base = the merged branch) to the default branch. `--rebase` replays the named feature onto its recorded base branch instead of merging (e.g. `wkt merge --into <feature> --rebase`); it requires a clean tree and leaves the rebase in progress on conflict.
 
 ### `wkt clean`
 

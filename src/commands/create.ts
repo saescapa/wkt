@@ -12,6 +12,7 @@ import {
   removeWorktree,
   getWorkspaceStatus,
   getCommitsDiff,
+  normalizeBaseBranch,
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
@@ -78,7 +79,7 @@ export async function createCommand(
       mkdirSync(project.workspacesPath, { recursive: true });
     }
 
-    const baseBranch = options.from || project.defaultBranch;
+    const baseBranch = normalizeBaseBranch(options.from || project.defaultBranch);
 
     await fetchAll(project.bareRepoPath);
 

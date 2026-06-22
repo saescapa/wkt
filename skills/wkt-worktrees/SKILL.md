@@ -101,8 +101,9 @@ workspace can conflict with an earlier one that already landed. When that
 happens:
 
 - Do **not** pass `--clean` on a conflicting merge — you'll want the workspace.
-- Resolve in the source workspace: rebase it on the updated default branch
-  (`git fetch` + `git rebase`), re-commit, then retry the merge.
+- Resolve in the source workspace: rebase it onto the updated default branch
+  with `wkt merge --into <workspace> --rebase` (replays the feature onto its
+  base; resolve any conflicts it reports), then retry the merge.
 - If tasks conflict structurally, that's the signal they weren't actually
   independent — fold them into one sequential workspace.
 
@@ -147,6 +148,20 @@ so new work never starts from stale history:
 
 Either way the goal is the same: every task starts from a clean, current base.
 
+## Stacked branches
+
+Creating a workspace with `--from <branch>` (where `<branch>` is another feature,
+not the default) *stacks* it on that branch — it inherits the parent's unmerged
+work. This is deliberate for dependent work, but cuts against "fresh base," so
+prefer it only when the second task genuinely builds on the first.
+
+- `wkt -y list` tags stacked workspaces `↳stacked` with their commits ahead/behind
+  their base, so you can see the dependency at a glance.
+- When the parent branch merges into the default branch, `wkt merge` automatically
+  re-points the stack's base to the default branch and tells you so.
+- After that, replay the stacked workspace onto the updated default with
+  `wkt -y merge --into <workspace> --rebase` before continuing or merging it.
+
 ## Quick reference
 
 | Goal | Command |
@@ -156,5 +171,6 @@ Either way the goal is the same: every task starts from a clean, current base.
 | Merge a workspace into default + clean | `wkt -y merge <workspace> --clean` |
 | Squash-merge | `wkt -y merge <workspace> --squash --clean` |
 | Merge into a non-default branch | `wkt -y merge <workspace> --into <branch>` |
+| Rebase a feature onto its base | `wkt -y merge --into <workspace> --rebase` |
 | Remove merged workspaces | `wkt -y clean --merged --force` |
 | Full agent contract from the CLI | `wkt help agent` |
