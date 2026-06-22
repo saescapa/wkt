@@ -25,6 +25,7 @@ src/
 │   ├── list.ts           # wkt list
 │   ├── clean.ts          # wkt clean
 │   ├── rename.ts         # wkt rename
+│   ├── reconcile.ts        # wkt reconcile
 │   ├── info.ts           # wkt info
 │   ├── shared.ts         # wkt shared
 │   └── config.ts         # wkt config
