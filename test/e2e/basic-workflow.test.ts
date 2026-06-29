@@ -271,6 +271,18 @@ describe('WKT CLI', () => {
       expect(result.stdout).toContain('payments');
     });
 
+    it('should create a workspace with --path-only outputting only the path', async () => {
+      const result = await wkt(['create', 'test-project', 'feature/settings', '--path-only'], wktHome);
+
+      expect(result.exitCode).toBe(0);
+      const output = result.stdout.trim();
+      expect(output.split('\n')).toHaveLength(1);
+      expect(output).toContain('settings');
+      expect(output).not.toContain('Successfully created workspace');
+      expect(output).not.toContain('Next steps');
+      expect(existsSync(output)).toBe(true);
+    });
+
     it('should switch workspace with --path-only', async () => {
       const result = await wkt(['switch', 'auth', '--path-only'], wktHome);
 

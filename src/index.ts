@@ -90,6 +90,7 @@ program
   .option('--template <template>', 'Apply workspace template')
   .option('--no-checkout', 'Create but don\'t checkout')
   .option('--force', 'Overwrite existing workspace')
+  .option('--path-only', 'Output only the workspace path (useful for shell integration)')
   .action(createCommand);
 
 program

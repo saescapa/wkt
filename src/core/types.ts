@@ -107,6 +107,7 @@ export interface CreateCommandOptions extends BaseCommandOptions {
   template?: string;
   checkout?: boolean;
   description?: string;
+  pathOnly?: boolean;
 }
 
 export interface SwitchCommandOptions extends BaseCommandOptions {

@@ -71,9 +71,11 @@ export async function createCommand(
       throw new DirectoryExistsError(workspacePath);
     }
 
-    console.log(chalk.blue(`Creating workspace '${workspaceName}' for project '${projectName}'...`));
-    console.log(chalk.gray(`Branch: ${inferredBranchName}`));
-    console.log(chalk.gray(`Base: ${options.from || project.defaultBranch}`));
+    if (!options.pathOnly) {
+      console.log(chalk.blue(`Creating workspace '${workspaceName}' for project '${projectName}'...`));
+      console.log(chalk.gray(`Branch: ${inferredBranchName}`));
+      console.log(chalk.gray(`Base: ${options.from || project.defaultBranch}`));
+    }
 
     if (!existsSync(project.workspacesPath)) {
       mkdirSync(project.workspacesPath, { recursive: true });
@@ -120,6 +122,11 @@ export async function createCommand(
 
     setupSharedSymlinks(configManager.getProjectSharedPath(projectName), workspacePath);
 
+    if (options.pathOnly) {
+      console.log(workspacePath);
+      return;
+    }
+
     console.log(chalk.green(`✓ Successfully created workspace '${workspaceName}'`));
     console.log(chalk.gray(`  Path: ${workspacePath}`));
     console.log(chalk.gray(`  Branch: ${inferredBranchName}`));
@@ -161,7 +168,7 @@ export async function createCommand(
       }
     }
 
-    ErrorHandler.handle(error);
+    ErrorHandler.handle(error, { minimal: options.pathOnly });
   }
 }
 
