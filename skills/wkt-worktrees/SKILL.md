@@ -20,12 +20,44 @@ This skill is the *when and how to orchestrate*. For the exact non-interactive
 flag contract of any command, run **`wkt help agent`**, and see
 `docs/reference/agent-usage.md` in the wkt repo for the full reference.
 
-## When to reach for this
+## Worktree or a branch in place?
 
-Use the parallel pattern when **the tasks are independent and touch disjoint
-files**. Parallel worktrees give no benefit — and create merge conflicts — when
-tasks edit the same files or depend on each other's output. In that case do the
-work sequentially in one workspace instead.
+Two ways to open a new line of work in a wkt repo:
+
+- **A new wkt workspace** (`wkt create`) — its own directory on its own branch.
+- **A branch in the workspace you're already in** (`git checkout -b`) — a new
+  branch, same directory.
+
+A new workspace is the instinct, but it isn't free: it costs a fresh directory
+(dependency install, build warm-up), and if you branch *in place* instead, wkt's
+database keeps pointing at the old branch — a `branch-drift` that `wkt reconcile`
+later has to fix. Pick by what the work actually needs.
+
+**Reach for a new workspace when *any* of these is true:**
+
+- **Concurrency** — two or more tasks must make progress at the same time
+  (parallel subagents; or you want a build / dev server / test run holding in one
+  directory while you edit in another). One directory checks out one branch.
+- **Preserve in-flight state** — the current workspace has uncommitted changes or
+  a running process you don't want to stash or interrupt.
+- **Clean isolation** — you want to start from the current default branch without
+  inheriting whatever the current directory is carrying.
+- **Independent shippable feature** — it'll be reviewed and merged on its own
+  cadence.
+
+**A branch in place is fine — and lighter — when *all* of these hold:**
+
+- The work is **sequential** (nothing else running alongside it).
+- The current tree is **clean and committed** (nothing to preserve, nothing to
+  collide with).
+- It's a short continuation in the same context, where a second directory's setup
+  cost buys nothing.
+- You'll merge or delete that branch before moving on — or run `wkt reconcile` so
+  the database catches up to the branch you actually switched to.
+
+When two tasks touch the **same files or depend on each other's output**, neither
+parallel workspaces nor parallel branches help: that work is not independent, so
+do it sequentially in one place.
 
 ## Non-interactive contract (always)
 
@@ -78,7 +110,9 @@ Spawn one subagent per workspace. Each subagent's instructions **must**:
 
 ### 4. Merge each workspace back into the default branch
 
-Merge sequentially, one workspace at a time, after its subagent reports done:
+Before merging any workspace, confirm it's merge-*ready* — see
+[Before you merge](#before-you-merge--readiness) below. Then merge sequentially,
+one workspace at a time, after its subagent reports done:
 
 ```bash
 wkt -y merge feature-task-a --clean      # merge, then remove the workspace
@@ -106,6 +140,48 @@ happens:
   base; resolve any conflicts it reports), then retry the merge.
 - If tasks conflict structurally, that's the signal they weren't actually
   independent — fold them into one sequential workspace.
+
+## Before you merge — readiness
+
+`wkt merge` moves git history; it does **not** check whether the change is
+*complete*. A clean merge of an incomplete branch still lands an incomplete
+default. Before merging — whether it's a fanned-out workspace or a branch you
+made in place — confirm:
+
+- **Work is committed.** `wkt merge` only moves committed history; uncommitted
+  changes stay behind in the source. This is the most common mistake.
+- **Docs travel with the code.** The branch isn't merge-ready until the docs that
+  describe its change are updated *in the same branch* — user guide / reference
+  for user-facing behavior, architecture docs if structure changed, and `--help`
+  / error-message text in the source. Don't leave them for "after the merge."
+- **CHANGELOG updated.** Add an entry under `## [Unreleased]` for any user-facing
+  change before the branch lands, so the changelog never lags the code.
+
+Why it matters here specifically: the next task forks from the default branch
+(see [Starting the next task from a fresh base](#starting-the-next-task-from-a-fresh-base)).
+Merge code without its docs and changelog, and every later branch inherits that
+gap — the drift compounds instead of getting caught.
+
+## Shared docs.local across parallel workspaces
+
+If the project keeps working notes in a `docs.local/` that resolves (via symlink) to a
+**shared, remote-backed** docs repo — one every workspace and every machine points at —
+then parallel subagents all write into the *same* git repo, so it can race and drift.
+Keep it consistent:
+
+- **Pull before, push after.** Fetch latest before writing (`git -C <docs-root> pull
+  --rebase --autostash`) and push right after committing. Don't let a workspace sit on a
+  stale docs base or leave notes unpushed at the end of a run.
+- **Let the pipeline skill do it.** `/local-plan` (new/handoff/promote/activate/archive/
+  sync) already pulls-then-commits-then-pushes and scopes commits to the project's folder.
+  Prefer it over hand-rolled git in the docs repo.
+- **One file per item, `YYYY-MM-DD-slug`.** Each plan/handoff/idea is its own dated file, so
+  two subagents writing different notes touch different files → no conflict. Never have two
+  agents edit the same doc, and avoid shared index files everyone appends to.
+- **It's a separate repo from the code.** A docs-repo conflict never blocks a `wkt merge` of
+  the code branch, and vice-versa — resolve each in its own repo. Never force-push the docs repo.
+
+Run `/docs-review` periodically — it flags unpushed / behind-remote state so drift surfaces early.
 
 ## Cleanup
 
@@ -167,10 +243,13 @@ prefer it only when the second task genuinely builds on the first.
 | Goal | Command |
 |------|---------|
 | Find project / current workspace | `wkt info --json` · `wkt -y list` |
+| New line of work, concurrent / isolated | `wkt -y create <project> <branch> --path-only` |
+| New line of work, sequential on a clean tree | `git checkout -b <branch>` (then `wkt reconcile`) |
 | Create a workspace (print path) | `wkt -y create <project> <branch> --path-only` |
 | Merge a workspace into default + clean | `wkt -y merge <workspace> --clean` |
 | Squash-merge | `wkt -y merge <workspace> --squash --clean` |
 | Merge into a non-default branch | `wkt -y merge <workspace> --into <branch>` |
 | Rebase a feature onto its base | `wkt -y merge --into <workspace> --rebase` |
 | Remove merged workspaces | `wkt -y clean --merged --force` |
+| Fix git ↔ database drift (e.g. after branching in place) | `wkt reconcile` |
 | Full agent contract from the CLI | `wkt help agent` |

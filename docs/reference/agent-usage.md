@@ -53,6 +53,8 @@ wkt create <project> <branch-name> [--from <base>] [--description "<text>"]
 
 Both `<project>` and `<branch-name>` are required non-interactively when more than one project is initialized.
 
+**When to create a workspace vs. branch in place.** A new workspace earns its directory cost when work runs concurrently (parallel subagents, or a build/server held in one dir while you edit another), must preserve in-flight state, or needs clean isolation from the current tree. For sequential work on a clean, committed tree, a plain `git checkout -b` in the current workspace is lighter — but it drifts the wkt database off the recorded branch, so follow with `wkt reconcile`. The full decision criteria live in the `wkt-worktrees` skill.
+
 ### `wkt switch`
 
 Switch to a workspace.
@@ -85,6 +87,8 @@ wkt merge <workspace> [-p <project>] [--into <branch>] [--squash] [--clean] [--r
 ```
 
 Workspace name required when not running from within a workspace. If the source has uncommitted changes, the merge cancels unless `--force` is passed.
+
+**Merge-readiness.** `wkt merge` moves committed git history only — it does not verify the change is complete. Before merging a feature branch into the default, confirm the work is committed, the docs that describe it are updated *in the same branch* (user guide / reference, architecture if structure changed, `--help` and error text), and a `## [Unreleased]` CHANGELOG entry exists for any user-facing change. Merging code without its docs leaves every later branch — which forks from the default — inheriting the gap.
 
 Merging a branch into the default branch auto-re-points any workspace stacked on it (base = the merged branch) to the default branch. `--rebase` replays the named feature onto its recorded base branch instead of merging (e.g. `wkt merge --into <feature> --rebase`); it requires a clean tree and leaves the rebase in progress on conflict.
 

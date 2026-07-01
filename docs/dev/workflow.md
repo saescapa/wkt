@@ -114,6 +114,31 @@ bun run build       # Output to dist/
 4. **No dead code** - Delete unused code, don't comment it out
 5. **Test behavior, not implementation** - Tests should survive refactors
 
+## Worktrees: a workspace or a branch in place?
+
+wkt manages git worktrees, but not every new branch needs one. Choose by what
+the work needs:
+
+- **New workspace (`wkt create`)** when work runs **concurrently** (parallel
+  agents, or a build/server held in one directory while you edit another), must
+  **preserve in-flight state** (uncommitted changes, a running process), or needs
+  **clean isolation** from the current tree.
+- **Branch in place (`git checkout -b`)** when work is **sequential** on a
+  **clean, committed** tree and a second directory's setup cost buys nothing.
+  Branching in place drifts the wkt database off the recorded branch — run
+  `wkt reconcile` afterward so it catches up.
+
+The full decision criteria and the parallel fan-out workflow live in the
+`wkt-worktrees` skill (`skills/wkt-worktrees/SKILL.md`).
+
+## Merge-readiness
+
+A feature branch isn't ready to merge into the default just because it's
+committed. The **Documentation** and **CHANGELOG** items in the Session Exit
+Checklist below *are* the merge-readiness gate: docs that describe a change must
+land in the same branch as the change. Merging code without its docs leaves every
+later branch — which forks from the default — inheriting the gap.
+
 ## Session Exit Checklist
 
 Before ending a development session:
