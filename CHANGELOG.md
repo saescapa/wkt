@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Shared-file mirroring now skips backup/swap artifacts (`.backup*`, `*~`, `*.swp`) so stray files in a project's `shared/` directory no longer leak into workspaces as symlinks
+
 ## [0.2.0] - 2026-07-01
 
 ### Added

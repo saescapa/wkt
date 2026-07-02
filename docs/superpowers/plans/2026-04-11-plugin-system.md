@@ -1,5 +1,14 @@
 # Plugin System Implementation Plan
 
+> **⚠️ SUPERSEDED — do not execute.** This plan targets a codebase that still had
+> the scripts/hooks system, `SafeScriptExecutor`, and `wkt run` — all removed in
+> commit `875e6ad` ("refactor: remove scripts/hooks system and wkt run"). Every
+> task below references infrastructure that no longer exists (`src/utils/script-executor.ts`,
+> `src/commands/run.ts`, the `Script*` types). Executing it would re-add ~1,441
+> lines of a system that was intentionally shed to keep wkt lean. Kept only as a
+> historical record. See `docs/reference/post-checkout-hook.md` for the sanctioned
+> lifecycle mechanism.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a local, manifest-driven plugin system to WKT that hooks into workspace lifecycle events, provides run scripts, and manages persistent plugin data.

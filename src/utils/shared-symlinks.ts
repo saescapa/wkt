@@ -4,6 +4,15 @@ import chalk from 'chalk';
 
 const IGNORED_ENTRIES = new Set(['.git', '.gitignore', '.DS_Store']);
 
+// Backup/swap artifacts that occasionally land in a project's shared/ directory.
+// Everything in shared/ is mirrored into each workspace, so junk like a stray
+// editor swapfile or a dated backup would otherwise leak in as a symlink.
+const IGNORED_PATTERNS = [/^\.backup/, /~$/, /\.swp$/];
+
+function isIgnoredEntry(entry: string): boolean {
+  return IGNORED_ENTRIES.has(entry) || IGNORED_PATTERNS.some((pattern) => pattern.test(entry));
+}
+
 export function setupSharedSymlinks(sharedPath: string, workspacePath: string): void {
   if (!existsSync(sharedPath)) return;
 
@@ -18,7 +27,7 @@ export function setupSharedSymlinks(sharedPath: string, workspacePath: string): 
   const skipped: string[] = [];
 
   for (const entry of entries) {
-    if (IGNORED_ENTRIES.has(entry)) continue;
+    if (isIgnoredEntry(entry)) continue;
 
     const source = join(sharedPath, entry);
     const target = join(workspacePath, entry);
