@@ -1,5 +1,13 @@
 # Plugin System Design
 
+> **⚠️ SUPERSEDED — do not implement.** This design assumes wkt's scripts/hooks
+> system and `wkt run` command, which were **deliberately removed** in commit
+> `875e6ad` ("refactor: remove scripts/hooks system and wkt run"). wkt has no
+> lifecycle-hook or plugin system by design — lifecycle work belongs in git's
+> `post-checkout` hook (see `docs/reference/post-checkout-hook.md`), and ad-hoc
+> execution in shell aliases or a task runner. This document is kept only as a
+> record of the explored design. Building it would reverse `875e6ad`.
+
 ## Overview
 
 A local, manifest-driven plugin system for WKT that lets plugins hook into workspace lifecycle events, provide run scripts, and manage persistent data. Plugins are directories with a `plugin.yaml` manifest and scripts — no JS plugin API, no distribution mechanism, no CLI namespace extension.
