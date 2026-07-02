@@ -48,6 +48,21 @@ describe('setupSharedSymlinks', () => {
     expect(lstatSync(join(workspacePath, '.DS_Store'), { throwIfNoEntry: false })).toBeUndefined();
   });
 
+  it('skips backup and swap artifacts so junk in shared/ does not leak in', () => {
+    mkdirSync(join(sharedPath, '.backup-claude-local-20260608'));
+    writeFileSync(join(sharedPath, 'notes.md~'), 'editor backup');
+    writeFileSync(join(sharedPath, '.notes.md.swp'), 'vim swap');
+    writeFileSync(join(sharedPath, 'docs.local'), 'kept');
+
+    setupSharedSymlinks(sharedPath, workspacePath);
+
+    expect(lstatSync(join(workspacePath, '.backup-claude-local-20260608'), { throwIfNoEntry: false })).toBeUndefined();
+    expect(lstatSync(join(workspacePath, 'notes.md~'), { throwIfNoEntry: false })).toBeUndefined();
+    expect(lstatSync(join(workspacePath, '.notes.md.swp'), { throwIfNoEntry: false })).toBeUndefined();
+    // Real entries are still symlinked.
+    expect(lstatSync(join(workspacePath, 'docs.local')).isSymbolicLink()).toBe(true);
+  });
+
   it('does not overwrite existing files in the workspace', () => {
     writeFileSync(join(sharedPath, 'README.md'), 'shared');
     writeFileSync(join(workspacePath, 'README.md'), 'tracked');
