@@ -20,6 +20,28 @@ npm link
 - Git
 - Bun (for building from source)
 
+### Updating
+
+WKT is installed from a source clone, so updating is a pull + rebuild:
+
+```bash
+cd /path/to/wkt      # your wkt clone
+git pull
+bun install          # in case dependencies changed
+bun run build        # refresh dist/ (npm link already points here)
+```
+
+Check what you're running and what changed:
+
+```bash
+wkt --version        # reports the installed package version
+```
+
+See [CHANGELOG.md](../../CHANGELOG.md) for what each version added, changed, or
+removed. Your `~/.wkt/database.json` and `config.yaml` upgrade automatically on the
+next command — the database runs schema migrations and config backfills new keys
+from defaults, so no manual migration is needed.
+
 ## Quick Start
 
 ```bash

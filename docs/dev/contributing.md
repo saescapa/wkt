@@ -264,6 +264,24 @@ chore: upgrade dependencies
 3. Update `.wkt.yaml.example`
 4. Update docs/configuration.md
 
+### Schema changes
+
+Users update by pulling and rebuilding, so their existing `~/.wkt/database.json`
+and `config.yaml` outlive many code changes. Any change to the persisted schema
+must upgrade that on-disk state, not just the types:
+
+1. **New required field on `Project`/`Workspace`/`metadata`** → add a migration in
+   `src/core/migrations.ts` that backfills it, and bump `CURRENT_SCHEMA_VERSION`.
+   The version bump alone does not add the field.
+2. **Add a fixture test** in `test/unit/migrations.test.ts` that loads a legacy
+   shape (field omitted) and asserts it is populated after migration. A required
+   field shipped without a backfill + test is how an older DB breaks a newer build.
+3. **New config key** → give it a default in `getDefaultConfig()`; the per-section
+   deep-merge in `config.ts` backfills it into existing files automatically (no
+   migration needed).
+
+Optional fields (`field?: T`) that the code always guards need neither.
+
 ### Adding a Utility
 
 1. Create in `src/utils/`
@@ -273,11 +291,28 @@ chore: upgrade dependencies
 
 ## Release Process
 
-1. Update version in `package.json`
-2. Update CHANGELOG (if exists)
-3. Create git tag
-4. Push to main
-5. (Future: npm publish)
+WKT is distributed as a source clone: users install with `git clone` + `bun install`
++ `bun run build` + `npm link`, and update with `git pull` + rebuild. Releases are
+git tags — there is no registry publish (yet). Tags give everyone a shared version
+to name; `wkt --version` reports whatever is in `package.json`.
+
+Every user-facing change lands with a `CHANGELOG.md` entry under `[Unreleased]` in
+the same PR (see below). Cutting a release just promotes that section:
+
+1. Move `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, leaving a fresh
+   empty `[Unreleased]` on top.
+2. Bump `version` in `package.json` to match.
+3. `bun run build && bun test` — green before tagging.
+4. `git tag vX.Y.Z && git push --tags` (push code first).
+5. (Future: npm publish / Homebrew formula.)
+
+### Keeping the changelog honest
+
+The changelog is only useful to other users if it stays current, so add the entry
+*with the change*, not at release time. A local (uncommitted) `pre-push` hook can
+enforce this for maintainers — see the "Personal changelog gate" note in the repo's
+`.git/info/exclude` setup. It is intentionally not a committed husky hook, so it
+never fires for contributors who don't opt in.
 
 ## Questions?
 

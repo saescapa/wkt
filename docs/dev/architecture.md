@@ -83,28 +83,30 @@ Key methods:
 
 ### Database Migrations (`src/core/migrations.ts`)
 
-Schema versioning and migration system for database upgrades:
+Schema versioning and migration system for database upgrades. `DatabaseManager.getDatabase()` runs `migrateDatabase()` automatically whenever a loaded `~/.wkt/database.json` reports a schema version below `CURRENT_SCHEMA_VERSION`, then persists the upgraded file.
+
+Each migration bumps the version *and* transforms the data. A migration that introduces or requires a new field **must backfill it for existing databases** — the version bump alone does nothing. For example, the v4 migration defaults `defaultBranch`, `baseBranch`, and workspace `status` on databases written before those became required:
 
 ```typescript
-export const CURRENT_SCHEMA_VERSION = 2;
-
-export const migrations: Migration[] = [
-  {
-    version: 2,
-    description: 'Add mode field to workspaces',
-    migrate: (db) => {
-      for (const workspace of Object.values(db.workspaces)) {
-        if (!workspace.mode) {
-          workspace.mode = 'branched';
-        }
+{
+  version: 4,
+  description: 'Backfill required workspace/project fields (defaultBranch, baseBranch, status)',
+  migrate: (db) => {
+    for (const workspace of Object.values(db.workspaces)) {
+      if (!workspace.baseBranch) {
+        workspace.baseBranch =
+          db.projects[workspace.projectName]?.defaultBranch ?? 'main';
       }
-      return db;
+      // ...
     }
+    return db;
   }
-];
+}
 ```
 
-The `DatabaseManager` automatically runs migrations when loading the database. Add new migrations to the `migrations` array when schema changes are needed.
+The guard in `migrateDatabase()` also warns (and leaves the data untouched) when a database reports a version *newer* than the running code supports — so a user on an older build won't silently corrupt state written by a newer one.
+
+**When you change the schema:** add a migration that backfills, and add a fixture test in `test/unit/migrations.test.ts` that loads a legacy shape and asserts the required fields end up populated. See [Contributing → Schema changes](contributing.md#schema-changes).
 
 ### Configuration (`src/core/config.ts`)
 

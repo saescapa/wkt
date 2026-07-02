@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { program } from 'commander';
 import chalk from 'chalk';
 import { initCommand } from './commands/init.js';
@@ -16,6 +19,22 @@ import { sharedCommand } from './commands/shared.js';
 import { helpCommand } from './commands/help.js';
 import { Logger, logger } from './utils/logger.js';
 import { ErrorHandler } from './utils/errors.js';
+
+// Read the version from package.json at runtime so `wkt --version` tracks the
+// build and never drifts. Resolves relative to this file in both dev
+// (src/index.ts) and bundled (dist/index.js) layouts, where package.json sits
+// one directory up.
+function getVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')) as {
+      version?: string;
+    };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 // Global error handlers
 process.on('unhandledRejection', (reason: unknown) => {
@@ -41,7 +60,7 @@ process.on('uncaughtException', (error: Error) => {
 program
   .name('wkt')
   .description('A flexible CLI tool for managing multiple project working directories using git worktrees')
-  .version('0.1.0')
+  .version(getVersion())
   .option('--debug', 'Enable debug logging')
   .option('-y, --yes', 'Non-interactive mode: auto-accept confirmations, fail on required prompts (also via WKT_NON_INTERACTIVE=1)')
   .hook('preAction', (thisCommand) => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
 import { join } from 'path';
 import { spawn, execSync } from 'child_process';
-import { rmSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 
 interface CommandResult {
@@ -113,9 +113,12 @@ describe('WKT CLI', () => {
 
     it('should handle --version flag', async () => {
       const result = await wkt(['--version'], wktHome);
+      const { version } = JSON.parse(
+        readFileSync(join(import.meta.dir, '../../package.json'), 'utf-8')
+      ) as { version: string };
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('0.1.0');
+      expect(result.stdout).toContain(version);
     });
 
     it('should show no projects when listing initially', async () => {

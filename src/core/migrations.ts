@@ -1,7 +1,9 @@
 import type { WKTDatabase } from './types.js';
 import { logger } from '../utils/logger.js';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
+
+const DEFAULT_BRANCH = 'main';
 
 export interface Migration {
   version: number;
@@ -9,7 +11,9 @@ export interface Migration {
   migrate: (db: WKTDatabase) => WKTDatabase;
 }
 
-// Define migrations in order - add new migrations here as the schema evolves
+// Define migrations in order - add new migrations here as the schema evolves.
+// A migration that adds or requires a new field MUST backfill it for existing
+// databases; see docs/dev/contributing.md ("Schema changes").
 export const migrations: Migration[] = [
   {
     version: 2,
@@ -20,6 +24,33 @@ export const migrations: Migration[] = [
     version: 3,
     description: 'Schema update (no-op)',
     migrate: (db): WKTDatabase => db
+  },
+  {
+    version: 4,
+    description: 'Backfill required workspace/project fields (defaultBranch, baseBranch, status)',
+    migrate: (db): WKTDatabase => {
+      for (const project of Object.values(db.projects)) {
+        if (!project.defaultBranch) {
+          project.defaultBranch = DEFAULT_BRANCH;
+        }
+      }
+      for (const workspace of Object.values(db.workspaces)) {
+        if (!workspace.baseBranch) {
+          workspace.baseBranch =
+            db.projects[workspace.projectName]?.defaultBranch ?? DEFAULT_BRANCH;
+        }
+        if (!workspace.status) {
+          workspace.status = {
+            clean: true,
+            staged: 0,
+            unstaged: 0,
+            untracked: 0,
+            conflicted: 0,
+          };
+        }
+      }
+      return db;
+    }
   }
 ];
 
