@@ -69,6 +69,21 @@ Workspace name is required. If the name is ambiguous across projects, qualify wi
 
 Fully non-interactive. Filters: `-p`, `--filter`, `--dirty`, `--stale`, `--all`.
 
+**Scope to one project when working within one.** Unscoped `wkt list` prints every
+workspace of every project on the machine. When the task lives in a single project
+(session init, docs pipelines, feature work — the usual case), pass `-p`:
+
+```bash
+wkt -y list -p <project>
+```
+
+The project name doesn't require a global list to discover: it's the first path
+segment under `~/.wkt/workspaces/` (workspace paths are
+`~/.wkt/workspaces/<project>/<workspace>`), or read `projectName` from
+`wkt info --json` when inside a workspace. Reserve unscoped `wkt -y list` for genuine
+cross-project sweeps — e.g. the mandatory `wkt -y list --dirty` audit before
+`wkt clean --force`.
+
 ### `wkt info`
 
 ```

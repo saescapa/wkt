@@ -81,7 +81,20 @@ wkt info --json          # if you're already inside a workspace
 wkt -y list              # otherwise — shows projects and their workspaces
 ```
 
-The project name is the first path segment in `wkt list` output.
+The project name is the first path segment in `wkt list` output — and in every
+workspace path (`~/.wkt/workspaces/<project>/<workspace>`), so when you're already
+inside a workspace you can read it straight from `pwd` or from the `projectName`
+field of `wkt info --json` without listing anything.
+
+Once the project is known, **scope every subsequent list to it** — an unscoped
+`wkt -y list` dumps every project on the machine into your context:
+
+```bash
+wkt -y list -p <project>
+```
+
+The one deliberate exception is the cross-project `wkt -y list --dirty` audit
+before cleanup (see Cleanup below).
 
 ### 2. Create one workspace per task
 
@@ -243,6 +256,7 @@ prefer it only when the second task genuinely builds on the first.
 | Goal | Command |
 |------|---------|
 | Find project / current workspace | `wkt info --json` · `wkt -y list` |
+| List one project's workspaces | `wkt -y list -p <project>` |
 | New line of work, concurrent / isolated | `wkt -y create <project> <branch> --path-only` |
 | New line of work, sequential on a clean tree | `git checkout -b <branch>` (then `wkt reconcile`) |
 | Create a workspace (print path) | `wkt -y create <project> <branch> --path-only` |
