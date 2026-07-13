@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `wkt clean` now honors `-p/--project` (previously accepted but ignored): scopes bulk cleanup to one project and disambiguates workspace names that exist in multiple projects (ambiguous names now error instead of removing an arbitrary match)
+- `wkt clean` refuses to remove a workspace with uncommitted changes unless `--force` is passed (previously deleted them silently via `git worktree remove --force`)
+- Input validation at the CLI boundary: `wkt init` rejects repository URLs outside http(s)/ssh/git/file/scp-style/local-path forms (blocks `ext::` and `--upload-pack` transport tricks) and project names with path separators; `git clone` is invoked with a `--` separator
+- Database writes are serialized across concurrent wkt processes via an on-disk lock, so parallel `wkt create` runs no longer clobber each other's records
+
+### Changed
+- Main workspaces and workspaces whose merge status cannot be verified (e.g. after a failed fetch) can no longer be removed with `clean --force` — unverifiable is not treated as merged
+- `wkt create --from` no longer defaults to `main` in the CLI parser, so projects whose default branch is `master` (or anything else) base new workspaces on their actual default branch
+- Project template config (applied via `wkt init --template` / `--apply-template`) now actually takes effect for naming strategy and inference patterns in `create`/`rename`; `wkt config --project <name>` shows the effective merged config and errors on unknown projects
+- `wkt list --dirty` recomputes git status live instead of trusting the cached status, so it is reliable as a pre-cleanup audit
+- `wkt config path|edit|debug` honor `WKT_HOME` instead of hardcoding `~/.wkt`
+- `wkt merge --clean` after a squash merge now deletes the source branch (`-d` refused non-ancestor branches); merge failures to compare against the target ref are reported instead of masquerading as "no commits ahead"
+- Removed unread config keys (`git.*`, `workspace.auto_cleanup`, `workspace.max_age_days`, `wkt.default_project`, `aliases`) and the never-read workspace `.wkt.yaml` tier; `.wkt.yaml.example` replaced by `config.yaml.example` matching the real schema
+- Removed the no-op `wkt switch --create` flag
+
 ### Fixed
 - Shared-file mirroring now skips backup/swap artifacts (`.backup*`, `*~`, `*.swp`) so stray files in a project's `shared/` directory no longer leak into workspaces as symlinks
 
@@ -44,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project repos are kept bare so `wkt init` succeeds, and `core.bare` no longer blocks `post-checkout` hooks
 - Ctrl+C during interactive prompts now exits silently (exit code 130) instead of showing a stack trace
 
-## [0.1.0] - 2024-12-27
+## [0.1.0] - 2025-12-27
 
 ### Added
 - Initial release of WKT (Worktree Kit)

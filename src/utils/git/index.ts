@@ -16,16 +16,12 @@ export {
   removeWorktree,
   moveWorktree,
   listWorktrees,
-  createDetachedWorktree,
-  resetDetachedWorktree,
-  createBranchFromDetached,
 } from './worktrees.js';
 export {
   getWorkspaceStatus,
   isWorkingTreeClean,
   getCommitsDiff,
   getCommitCountAhead,
-  getCommitsAheadOfRemote,
   getLastCommitInfo,
 } from './status.js';
-export { fetchAll, fetchInWorkspace, pullWithRebase, pushBranch, pushHEADToRemote } from './network.js';
+export { fetchAll } from './network.js';

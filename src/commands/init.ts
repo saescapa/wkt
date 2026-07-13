@@ -18,6 +18,7 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
+import { validateProjectName, validateRepositoryUrl } from '../utils/validation.js';
 import {
   ErrorHandler,
   WKTError,
@@ -101,7 +102,7 @@ export async function initCommand(
             type: 'input',
             name: 'inputUrl',
             message: 'Repository URL (git clone URL):',
-            validate: (input: string) => {
+            validate: (input: string): boolean | string => {
               if (!input.trim()) return 'Repository URL is required';
               if (!input.includes('git') && !input.includes('://') && !input.includes('@')) {
                 return 'Please enter a valid git repository URL';
@@ -122,6 +123,12 @@ export async function initCommand(
         throw new ValidationError('repository URL', 'Repository URL is required');
       }
 
+      // Validate user-supplied URLs before they reach `git clone`. URLs
+      // derived from an existing repo's origin were already accepted by git.
+      if (repositoryUrl) {
+        validateRepositoryUrl(repoUrl);
+      }
+
       if (!inferredProjectName) {
         const urlParts = repoUrl.split('/');
         const lastPart = urlParts[urlParts.length - 1];
@@ -131,6 +138,9 @@ export async function initCommand(
         inferredProjectName = lastPart.replace(/\.git$/, '');
       }
     }
+
+    // Project names become directory names under the wkt roots
+    validateProjectName(inferredProjectName);
 
     if (dbManager.getProject(inferredProjectName)) {
       throw new WKTError(

@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import type { GlobalConfig, Project, Workspace } from '../../src/core/types.js';
+import type { Project, Workspace } from '../../src/core/types.js';
 
 export class TestEnvironment {
   public testDir: string;
@@ -27,39 +27,6 @@ export class TestEnvironment {
     if (existsSync(this.testDir)) {
       rmSync(this.testDir, { recursive: true, force: true });
     }
-  }
-
-  getTestConfig(): GlobalConfig {
-    return {
-      wkt: {
-        workspace_root: this.workspacesDir,
-        projects_root: this.projectsDir,
-      },
-      workspace: {
-        naming_strategy: 'sanitized',
-        auto_cleanup: true,
-        max_age_days: 30,
-      },
-      git: {
-        default_base: 'main',
-        auto_fetch: true,
-        auto_rebase: false,
-        push_on_create: false,
-      },
-      inference: {
-        patterns: [
-          { pattern: '^(\\d+)$', template: 'feature/eng-{}' },
-          { pattern: '^eng-(\\d+)$', template: 'feature/{}' },
-          { pattern: '^(feature/.+)$', template: '{}' },
-        ],
-      },
-      projects: {},
-      aliases: {
-        ls: 'list',
-        sw: 'switch',
-        rm: 'clean',
-      },
-    };
   }
 
   createMockProject(name: string = 'test-project'): Project {

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { getCommitsAheadOfRemote, getWorkspaceStatus } from '../../src/utils/git/status.js';
+import { getCommitCountAhead, getWorkspaceStatus } from '../../src/utils/git/status.js';
 
 describe('Git Status Utilities', () => {
   let testDir: string;
@@ -42,53 +42,33 @@ describe('Git Status Utilities', () => {
     }
   });
 
-  describe('getCommitsAheadOfRemote', () => {
-    it('should return 0 commits when in sync with remote', async () => {
-      const result = await getCommitsAheadOfRemote(localRepo, 'main');
+  describe('getCommitCountAhead', () => {
+    it('should return 0 commits when in sync with the base', async () => {
+      const result = await getCommitCountAhead(localRepo, 'origin/main');
 
-      expect(result.count).toBe(0);
-      expect(result.commits).toHaveLength(0);
+      expect(result).toBe(0);
     });
 
-    it('should detect commits ahead of remote', async () => {
+    it('should count commits ahead of the base', async () => {
       // Create a new commit locally
       writeFileSync(join(localRepo, 'file1.txt'), 'content1');
       execSync('git add .', { cwd: localRepo, stdio: 'pipe' });
       execSync('git commit -m "Add file1"', { cwd: localRepo, stdio: 'pipe' });
 
-      const result = await getCommitsAheadOfRemote(localRepo, 'main');
+      expect(await getCommitCountAhead(localRepo, 'origin/main')).toBe(1);
 
-      expect(result.count).toBe(1);
-      expect(result.commits).toHaveLength(1);
-      expect(result.commits[0].message).toBe('Add file1');
-    });
-
-    it('should detect multiple commits ahead of remote', async () => {
       // Create another commit
       writeFileSync(join(localRepo, 'file2.txt'), 'content2');
       execSync('git add .', { cwd: localRepo, stdio: 'pipe' });
       execSync('git commit -m "Add file2"', { cwd: localRepo, stdio: 'pipe' });
 
-      const result = await getCommitsAheadOfRemote(localRepo, 'main');
-
-      expect(result.count).toBe(2);
-      expect(result.commits).toHaveLength(2);
-      // Commits should be in reverse chronological order
-      expect(result.commits[0].message).toBe('Add file2');
-      expect(result.commits[1].message).toBe('Add file1');
+      expect(await getCommitCountAhead(localRepo, 'origin/main')).toBe(2);
     });
 
-    it('should handle origin/ prefix in branch name', async () => {
-      const result = await getCommitsAheadOfRemote(localRepo, 'origin/main');
+    it('should return null when the base ref cannot be resolved', async () => {
+      const result = await getCommitCountAhead(localRepo, 'nonexistent');
 
-      expect(result.count).toBe(2);
-    });
-
-    it('should return 0 for non-existent remote branch', async () => {
-      const result = await getCommitsAheadOfRemote(localRepo, 'nonexistent');
-
-      expect(result.count).toBe(0);
-      expect(result.commits).toHaveLength(0);
+      expect(result).toBeNull();
     });
   });
 

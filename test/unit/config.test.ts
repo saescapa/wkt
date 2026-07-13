@@ -27,63 +27,61 @@ describe('ConfigManager', () => {
   describe('getConfig', () => {
     it('should return default config when no config file exists', () => {
       const config = configManager.getConfig();
-      
+
       expect(config.wkt.workspace_root).toContain('.wkt/workspaces');
       expect(config.wkt.projects_root).toContain('.wkt/projects');
       expect(config.workspace.naming_strategy).toBe('sanitized');
-      expect(config.git.default_base).toBe('main');
+      expect(config.display.hide_inactive_main_branches).toBe(true);
       expect(config.inference.patterns).toHaveLength(3);
     });
 
     it('should merge custom config with defaults', () => {
       const configPath = join(testEnv.wktHome, 'config.yaml');
       const customConfig = `
-wkt:
-  default_project: "my-project"
 workspace:
   naming_strategy: "kebab-case"
 projects:
   test-project:
-    git:
-      default_base: "develop"
+    workspace:
+      naming_strategy: "snake_case"
 `;
-      
+
       writeFileSync(configPath, customConfig);
-      
+
       const config = configManager.getConfig();
-      
-      expect(config.wkt.default_project).toBe('my-project');
+
       expect(config.workspace.naming_strategy).toBe('kebab-case');
-      expect(config.projects['test-project'].git?.default_base).toBe('develop');
+      expect(config.projects['test-project'].workspace?.naming_strategy).toBe('snake_case');
       // Should still have defaults
-      expect(config.git.default_base).toBe('main');
+      expect(config.display.main_branch_inactive_days).toBe(7);
+      expect(config.inference.patterns).toHaveLength(3);
     });
 
     it('should handle malformed config file gracefully', () => {
       const configPath = join(testEnv.wktHome, 'config.yaml');
       writeFileSync(configPath, 'invalid: yaml: content: [');
-      
+
       const config = configManager.getConfig();
-      
+
       // Should fall back to defaults
-      expect(config.git.default_base).toBe('main');
+      expect(config.workspace.naming_strategy).toBe('sanitized');
     });
   });
 
   describe('saveConfig', () => {
     it('should save config to YAML file', () => {
       const config = configManager.getConfig();
-      config.wkt.default_project = 'test-project';
-      
+      config.workspace.naming_strategy = 'kebab-case';
+
       configManager.saveConfig();
-      
+
       const configPath = join(testEnv.wktHome, 'config.yaml');
       expect(existsSync(configPath)).toBe(true);
-      
+
       // Reload and verify
       const newConfigManager = new ConfigManager();
       const reloadedConfig = newConfigManager.getConfig();
-      expect(reloadedConfig.wkt.default_project).toBe('test-project');
+      expect(reloadedConfig.workspace.naming_strategy).toBe('kebab-case');
     });
   });
 
@@ -118,26 +116,43 @@ projects:
       configManager.updateConfig({
         projects: {
           'test-project': {
-            git: { default_base: 'develop' },
             workspace: { naming_strategy: 'snake_case' },
           },
         },
       });
-      
+
       const projectConfig = configManager.getProjectConfig('test-project');
-      expect(projectConfig.git?.default_base).toBe('develop');
       expect(projectConfig.workspace?.naming_strategy).toBe('snake_case');
+    });
+
+    it('should overlay stored project overrides (templates) on the global section', () => {
+      configManager.updateConfig({
+        projects: {
+          'test-project': {
+            workspace: { naming_strategy: 'snake_case' },
+            inference: { patterns: [{ pattern: '^(x-.+)$', template: '{}' }] },
+          },
+        },
+      });
+
+      const projectConfig = configManager.getProjectConfig('test-project', {
+        workspace: { naming_strategy: 'kebab-case' },
+      });
+
+      // Override wins where set, global project section fills the rest
+      expect(projectConfig.workspace?.naming_strategy).toBe('kebab-case');
+      expect(projectConfig.inference?.patterns).toHaveLength(1);
     });
   });
 
   describe('updateProjectConfig', () => {
     it('should update project-specific config', () => {
       configManager.updateProjectConfig('test-project', {
-        git: { default_base: 'staging' },
+        workspace: { naming_strategy: 'kebab-case' },
       });
-      
+
       const projectConfig = configManager.getProjectConfig('test-project');
-      expect(projectConfig.git?.default_base).toBe('staging');
+      expect(projectConfig.workspace?.naming_strategy).toBe('kebab-case');
     });
   });
 

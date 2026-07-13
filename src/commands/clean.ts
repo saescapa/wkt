@@ -12,9 +12,11 @@ import {
   getBranchAge,
   getCommitCountAhead,
   getLastCommitInfo,
+  getWorkspaceStatus,
   fetchAll,
 } from '../utils/git/index.js';
 import { formatTimeAgo } from '../utils/format.js';
+import { isMainBranchWorkspace } from '../utils/workspace.js';
 
 interface CleanCheckResult {
   clean: boolean;
@@ -55,10 +57,22 @@ async function cleanSingleWorkspace(
   options: CleanCommandOptions
 ): Promise<void> {
   const allWorkspaces = db.getAllWorkspaces();
-  const workspace = allWorkspaces.find(w => w.name === workspaceName);
+  const matches = allWorkspaces.filter(
+    w => w.name === workspaceName && (!options.project || w.projectName === options.project)
+  );
+  const [workspace, ...otherMatches] = matches;
 
   if (!workspace) {
-    console.log(chalk.red(`Workspace '${workspaceName}' not found`));
+    const scope = options.project ? ` in project '${options.project}'` : '';
+    console.log(chalk.red(`Workspace '${workspaceName}' not found${scope}`));
+    return;
+  }
+
+  if (otherMatches.length > 0) {
+    console.log(chalk.red(
+      `Workspace name '${workspaceName}' exists in multiple projects: ${matches.map(w => w.projectName).join(', ')}`
+    ));
+    console.log(chalk.yellow('Use --project <name> to disambiguate'));
     return;
   }
 
@@ -98,10 +112,17 @@ async function cleanAllWorkspaces(
   db: DatabaseManager,
   options: CleanCommandOptions
 ): Promise<void> {
-  const allWorkspaces = db.getAllWorkspaces();
+  if (options.project && !db.getProject(options.project)) {
+    console.log(chalk.red(`Project '${options.project}' not found`));
+    return;
+  }
+
+  const allWorkspaces = options.project
+    ? db.getAllWorkspaces().filter(w => w.projectName === options.project)
+    : db.getAllWorkspaces();
 
   // Check for orphaned directories
-  const orphanedDirs = await findOrphanedDirectories(db);
+  const orphanedDirs = await findOrphanedDirectories(db, options.project);
 
   if (allWorkspaces.length === 0 && orphanedDirs.length === 0) {
     console.log(chalk.yellow('No workspaces to clean'));
@@ -243,28 +264,38 @@ async function cleanAllWorkspaces(
   }
 }
 
-function isMainBranchWorkspace(workspace: Workspace, project: Project): boolean {
-  // Check if this workspace is the main/master/default branch
-  const mainBranchNames = [project.defaultBranch, 'main', 'master'];
-  
-  return mainBranchNames.some(branchName => 
-    workspace.branchName === branchName || 
-    workspace.name === branchName
-  );
-}
-
 async function shouldCleanWorkspace(
   workspace: Workspace,
   project: Project,
   options: CleanCommandOptions
 ): Promise<CleanCheckResult> {
-  // Protect main branch workspaces (they contain shared files)
+  // Protect main branch workspaces (they contain shared files). Not
+  // force-overridable: losing the main workspace breaks every symlinked
+  // workspace in the project.
   if (isMainBranchWorkspace(workspace, project)) {
     return {
       clean: false,
       reason: `Cannot clean main branch workspace '${workspace.name}' (contains shared files)`,
-      canForce: true
+      canForce: false
     };
+  }
+
+  // Never remove uncommitted work silently — `git worktree remove --force`
+  // would destroy it. Force-overridable, but only after the warning.
+  if (existsSync(workspace.path)) {
+    const status = await getWorkspaceStatus(workspace.path);
+    if (!status.clean) {
+      const parts: string[] = [];
+      if (status.staged > 0) parts.push(`${status.staged} staged`);
+      if (status.unstaged > 0) parts.push(`${status.unstaged} unstaged`);
+      if (status.untracked > 0) parts.push(`${status.untracked} untracked`);
+      if (status.conflicted > 0) parts.push(`${status.conflicted} conflicted`);
+      return {
+        clean: false,
+        reason: `Working tree has uncommitted changes (${parts.join(', ')})`,
+        canForce: true
+      };
+    }
   }
 
   // Check if we should only clean merged branches
@@ -276,10 +307,12 @@ async function shouldCleanWorkspace(
     );
 
     if (mergeCheck.status === 'unknown') {
+      // Unverifiable is not the same as merged — refuse even under --force so
+      // a failed fetch can't turn into deleted unmerged work.
       return {
         clean: false,
         reason: `Could not verify merge status: ${mergeCheck.reason}`,
-        canForce: true
+        canForce: false
       };
     }
 
@@ -291,7 +324,7 @@ async function shouldCleanWorkspace(
         details.commitsAhead = await getCommitCountAhead(
           workspace.path,
           project.defaultBranch
-        );
+        ) ?? undefined;
         details.lastCommit = await getLastCommitInfo(workspace.path) ?? undefined;
       }
 
@@ -362,6 +395,8 @@ function displayCleanWarning(result: CleanCheckResult, workspaceName: string): v
 
   if (result.canForce) {
     console.log(chalk.gray(`\n   Use --force to override this protection`));
+  } else {
+    console.log(chalk.gray(`\n   This protection cannot be overridden with --force`));
   }
 }
 
@@ -400,9 +435,11 @@ async function removeWorkspace(workspace: Workspace, project: Project, db: Datab
   }
 }
 
-async function findOrphanedDirectories(db: DatabaseManager): Promise<Array<{ projectName: string; dirName: string; fullPath: string }>> {
+async function findOrphanedDirectories(db: DatabaseManager, projectName?: string): Promise<Array<{ projectName: string; dirName: string; fullPath: string }>> {
   const orphanedDirs: Array<{ projectName: string; dirName: string; fullPath: string }> = [];
-  const allProjects = db.getAllProjects();
+  const allProjects = projectName
+    ? db.getAllProjects().filter(p => p.name === projectName)
+    : db.getAllProjects();
   const allWorkspaces = db.getAllWorkspaces();
 
   for (const project of allProjects) {

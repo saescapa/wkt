@@ -77,7 +77,11 @@ export async function getCommitsDiff(workspacePath: string, baseBranch: string):
   }
 }
 
-export async function getCommitCountAhead(workspacePath: string, baseBranch: string): Promise<number> {
+/**
+ * Returns null (rather than 0) when the comparison itself fails, so callers
+ * can distinguish "no commits ahead" from "could not compare".
+ */
+export async function getCommitCountAhead(workspacePath: string, baseBranch: string): Promise<number | null> {
   try {
     const currentBranch = await getCurrentBranch(workspacePath);
     const result = await executeCommand(
@@ -87,48 +91,7 @@ export async function getCommitCountAhead(workspacePath: string, baseBranch: str
     return parseInt(result.trim(), 10) || 0;
   } catch (error) {
     logger.debug(`Failed to get commit count ahead: ${error instanceof Error ? error.message : String(error)}`);
-    return 0;
-  }
-}
-
-export async function getCommitsAheadOfRemote(
-  workspacePath: string,
-  remoteBranch: string
-): Promise<{ count: number; commits: Array<{ hash: string; message: string }> }> {
-  try {
-    // Compare HEAD against the remote branch (works for both detached and branched states)
-    const remoteRef = remoteBranch.startsWith('origin/') ? remoteBranch : `origin/${remoteBranch}`;
-
-    // Get count of commits ahead
-    const countResult = await executeCommand(
-      ['git', 'rev-list', '--count', `${remoteRef}..HEAD`],
-      workspacePath
-    );
-    const count = parseInt(countResult.trim(), 10) || 0;
-
-    if (count === 0) {
-      return { count: 0, commits: [] };
-    }
-
-    // Get commit details
-    const logResult = await executeCommand(
-      ['git', 'log', '--oneline', `${remoteRef}..HEAD`],
-      workspacePath
-    );
-
-    const commits = logResult
-      .trim()
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const [hash, ...messageParts] = line.split(' ');
-        return { hash: hash || '', message: messageParts.join(' ') };
-      });
-
-    return { count, commits };
-  } catch (error) {
-    logger.debug(`Failed to get commits ahead of remote: ${error instanceof Error ? error.message : String(error)}`);
-    return { count: 0, commits: [] };
+    return null;
   }
 }
 

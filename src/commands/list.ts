@@ -1,8 +1,9 @@
 import chalk from 'chalk';
+import { existsSync } from 'fs';
 import type { ListCommandOptions, Workspace } from '../core/types.js';
 import { DatabaseManager } from '../core/database.js';
 import { ConfigManager } from '../core/config.js';
-import { normalizeBaseBranch } from '../utils/git/index.js';
+import { normalizeBaseBranch, parseDuration, getWorkspaceStatus } from '../utils/git/index.js';
 import { formatTimeAgo } from '../utils/format.js';
 
 export async function listCommand(options: ListCommandOptions = {}): Promise<void> {
@@ -41,8 +42,18 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
     }
   }
 
-  // Filter by dirty (uncommitted changes)
+  // Filter by dirty (uncommitted changes). Status is computed live: the
+  // cached DB status is only refreshed by mutating commands, and --dirty is
+  // used as a safety check before cleanup, so it must not report stale state.
   if (options.dirty) {
+    workspaces = await Promise.all(
+      workspaces.map(async w => {
+        if (existsSync(w.path)) {
+          w.status = await getWorkspaceStatus(w.path);
+        }
+        return w;
+      })
+    );
     workspaces = workspaces.filter(w => !w.status.clean);
 
     if (workspaces.length === 0) {
@@ -53,7 +64,6 @@ export async function listCommand(options: ListCommandOptions = {}): Promise<voi
 
   // Filter by stale (older than specified duration)
   if (options.stale) {
-    const { parseDuration } = await import('../utils/git/index.js');
     try {
       const maxAge = parseDuration(options.stale);
       const now = Date.now();

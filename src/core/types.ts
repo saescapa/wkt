@@ -33,16 +33,8 @@ export interface WorkspaceStatus {
 }
 
 export interface ProjectConfig {
-  git?: {
-    default_base?: string;
-    auto_fetch?: boolean;
-    auto_rebase?: boolean;
-    push_on_create?: boolean;
-  };
   workspace?: {
     naming_strategy?: 'sanitized' | 'kebab-case' | 'snake_case';
-    auto_cleanup?: boolean;
-    max_age_days?: number;
   };
   inference?: {
     patterns?: InferencePattern[];
@@ -59,18 +51,9 @@ export interface GlobalConfig {
     workspace_root: string;
     projects_root: string;
     shared_root: string;
-    default_project?: string;
   };
   workspace: {
     naming_strategy: 'sanitized' | 'kebab-case' | 'snake_case';
-    auto_cleanup: boolean;
-    max_age_days: number;
-  };
-  git: {
-    default_base: string;
-    auto_fetch: boolean;
-    auto_rebase: boolean;
-    push_on_create: boolean;
   };
   display: {
     hide_inactive_main_branches: boolean;
@@ -81,7 +64,6 @@ export interface GlobalConfig {
   };
   projects: Record<string, ProjectConfig>;
   project_templates?: Record<string, ProjectConfig>;  // Reusable project templates
-  aliases: Record<string, string>;
 }
 
 export interface WKTDatabase {
@@ -113,7 +95,6 @@ export interface CreateCommandOptions extends BaseCommandOptions {
 export interface SwitchCommandOptions extends BaseCommandOptions {
   search?: boolean;
   project?: string;
-  create?: boolean;
   pathOnly?: boolean;
 }
 

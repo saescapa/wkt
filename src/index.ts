@@ -103,7 +103,7 @@ program
   .description('Create a new workspace')
   .argument('[project]', 'Project name (interactive if omitted)')
   .argument('[branch-name]', 'Branch name (interactive if omitted)')
-  .option('--from <branch>', 'Base branch (default: main/master)', 'main')
+  .option('--from <branch>', 'Base branch (default: project default branch)')
   .option('--name <name>', 'Custom workspace directory name')
   .option('--description <text>', 'Workspace description (e.g., "Splits feature")')
   .option('--template <template>', 'Apply workspace template')
@@ -118,7 +118,6 @@ program
   .argument('[workspace]', 'Workspace name (optional for interactive mode)')
   .option('-s, --search', 'Enable fuzzy search mode')
   .option('-p, --project <name>', 'Limit search to specific project')
-  .option('--create', 'Create workspace if it doesn\'t exist')
   .option('--path-only', 'Output only the workspace path (useful for shell integration)')
   .action(switchCommand);
 
@@ -163,7 +162,7 @@ program
   .command('rename')
   .description('Rename current workspace (optionally with new branch)')
   .argument('[new-name]', 'New workspace/branch name (interactive if omitted)')
-  .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: main)')
+  .option('--from <branch>', 'Base branch to rebase from when creating new branch (default: project default branch)')
   .option('--no-rebase', 'Simple rename: rename branch in-place without creating new branch or rebasing')
   .option('--name <name>', 'Custom workspace directory name (default: inferred from branch name)')
   .option('--description <text>', 'Update workspace description')

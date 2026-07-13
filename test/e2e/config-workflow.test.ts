@@ -245,7 +245,7 @@ describe('Config Workflow', () => {
       const result = await wkt(['config', 'show', '--project', projectName]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Project config for "${projectName}"`);
+      expect(result.stdout).toContain(`Effective config for project "${projectName}"`);
       // Should display project config as JSON
       expect(result.stdout).toContain('{');
       expect(result.stdout).toContain('}');
@@ -255,7 +255,7 @@ describe('Config Workflow', () => {
       const result = await wkt(['config', '--project', projectName]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Project config for "${projectName}"`);
+      expect(result.stdout).toContain(`Effective config for project "${projectName}"`);
     });
 
     it('should show project config as valid JSON object', async () => {
@@ -287,12 +287,11 @@ describe('Config Workflow', () => {
       expect(result.stdout).toContain('wkt config');
     });
 
-    it('should handle non-existent project gracefully', async () => {
+    it('should error on non-existent project', async () => {
       const result = await wkt(['config', '--project', 'nonexistent-project']);
 
-      expect(result.exitCode).toBe(0);
-      // Should show empty or null project config
-      expect(result.stdout).toContain('Project config for');
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('not found');
     });
   });
 
@@ -301,15 +300,15 @@ describe('Config Workflow', () => {
       const result = await wkt(['config', 'show', '--project', projectName]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Project config for "${projectName}"`);
+      expect(result.stdout).toContain(`Effective config for project "${projectName}"`);
     });
 
-    it('should handle config path with --project flag', async () => {
+    it('should show the global config path even with --project flag', async () => {
       const result = await wkt(['config', 'path', '--project', projectName]);
 
       expect(result.exitCode).toBe(0);
-      // With --project, should show project config path (.wkt.yaml)
-      expect(result.stdout).toContain('.wkt.yaml');
+      // Project config lives in the projects section of the global file
+      expect(result.stdout.trim().endsWith('config.yaml')).toBe(true);
     });
   });
 });

@@ -27,7 +27,8 @@ export async function getBareRepoUrl(repoPath: string): Promise<string> {
 
 export async function cloneBareRepository(repoUrl: string, targetPath: string): Promise<void> {
   await withRetry(
-    () => executeCommand(['git', 'clone', '--bare', repoUrl, targetPath]),
+    // `--` keeps a URL that begins with "-" from being parsed as an option
+    () => executeCommand(['git', 'clone', '--bare', '--', repoUrl, targetPath]),
     `Clone repository ${repoUrl}`
   );
 

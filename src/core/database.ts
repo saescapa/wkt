@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import type { WKTDatabase, Project, Workspace } from './types.js';
 import { ConfigManager } from './config.js';
@@ -69,7 +69,7 @@ export class DatabaseManager {
 
   saveDatabase(): void {
     if (!this.db) return;
-    
+
     this.configManager.ensureConfigDir();
     try {
       const dbJson = JSON.stringify(this.db, null, 2);
@@ -79,10 +79,66 @@ export class DatabaseManager {
     }
   }
 
+  /**
+   * Serialize mutations across concurrent wkt processes (parallel `wkt create`
+   * is a core workflow). Each mutation re-reads the file under an exclusive
+   * lock before applying, so one process's write can't clobber another's.
+   * The lock is a directory (mkdir is atomic); a lock older than 10s is
+   * treated as abandoned by a crashed process and stolen.
+   */
+  private withLock<T>(fn: () => T): T {
+    this.configManager.ensureConfigDir();
+    const lockPath = this.dbPath + '.lock';
+    const deadline = Date.now() + 5000;
+
+    for (;;) {
+      try {
+        mkdirSync(lockPath);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+        try {
+          const age = Date.now() - statSync(lockPath).mtimeMs;
+          if (age > 10_000) {
+            rmdirSync(lockPath);
+            continue;
+          }
+        } catch {
+          continue; // lock released between checks — retry immediately
+        }
+        if (Date.now() > deadline) {
+          throw new Error(`Timed out waiting for database lock: ${lockPath}`);
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+      }
+    }
+
+    try {
+      return fn();
+    } finally {
+      try {
+        rmdirSync(lockPath);
+      } catch {
+        // already removed (e.g. stolen as stale) — nothing to release
+      }
+    }
+  }
+
+  private mutate(apply: (db: WKTDatabase) => void): void {
+    this.withLock(() => {
+      this.db = null; // drop cache; re-read the file under the lock
+      const db = this.getDatabase();
+      apply(db);
+      this.saveDatabase();
+    });
+  }
+
   addProject(project: Project): void {
-    const db = this.getDatabase();
-    db.projects[project.name] = project;
-    this.saveDatabase();
+    this.mutate(db => {
+      db.projects[project.name] = project;
+    });
   }
 
   getProject(name: string): Project | undefined {
@@ -96,30 +152,29 @@ export class DatabaseManager {
   }
 
   updateProject(project: Project): void {
-    const db = this.getDatabase();
-    if (db.projects[project.name]) {
-      db.projects[project.name] = project;
-      this.saveDatabase();
-    }
+    this.mutate(db => {
+      if (db.projects[project.name]) {
+        db.projects[project.name] = project;
+      }
+    });
   }
 
   removeProject(name: string): void {
-    const db = this.getDatabase();
-    delete db.projects[name];
-    
-    Object.keys(db.workspaces).forEach(workspaceId => {
-      if (db.workspaces[workspaceId]?.projectName === name) {
-        delete db.workspaces[workspaceId];
-      }
+    this.mutate(db => {
+      delete db.projects[name];
+
+      Object.keys(db.workspaces).forEach(workspaceId => {
+        if (db.workspaces[workspaceId]?.projectName === name) {
+          delete db.workspaces[workspaceId];
+        }
+      });
     });
-    
-    this.saveDatabase();
   }
 
   addWorkspace(workspace: Workspace): void {
-    const db = this.getDatabase();
-    db.workspaces[workspace.id] = workspace;
-    this.saveDatabase();
+    this.mutate(db => {
+      db.workspaces[workspace.id] = workspace;
+    });
   }
 
   getWorkspace(id: string): Workspace | undefined {
@@ -137,22 +192,18 @@ export class DatabaseManager {
     return Object.values(db.workspaces).filter(w => w.projectName === projectName);
   }
 
-  getProjectWorkspaces(projectName: string): Workspace[] {
-    return this.getWorkspacesByProject(projectName);
-  }
-
   updateWorkspace(workspace: Workspace): void {
-    const db = this.getDatabase();
-    if (db.workspaces[workspace.id]) {
-      db.workspaces[workspace.id] = workspace;
-      this.saveDatabase();
-    }
+    this.mutate(db => {
+      if (db.workspaces[workspace.id]) {
+        db.workspaces[workspace.id] = workspace;
+      }
+    });
   }
 
   removeWorkspace(id: string): void {
-    const db = this.getDatabase();
-    delete db.workspaces[id];
-    this.saveDatabase();
+    this.mutate(db => {
+      delete db.workspaces[id];
+    });
   }
 
   searchWorkspaces(query: string, projectName?: string): Workspace[] {

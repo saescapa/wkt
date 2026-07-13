@@ -17,6 +17,8 @@ import {
   normalizeBaseBranch,
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
+import { isMainBranchWorkspace } from '../utils/workspace.js';
+import { validateBranchName } from '../utils/validation.js';
 import {
   ErrorHandler,
   WorkspaceNotFoundError,
@@ -44,19 +46,14 @@ export async function renameCommand(
     }
 
     // Protect main workspaces - they contain shared files
-    const mainBranchNames = [project.defaultBranch, 'main', 'master'];
-    const isMainWorkspace = mainBranchNames.some(branchName =>
-      workspace.branchName === branchName || workspace.name === branchName
-    );
-
-    if (isMainWorkspace) {
+    if (isMainBranchWorkspace(workspace, project)) {
       console.log(chalk.red(`✗ Cannot rename main workspace '${workspace.name}'`));
       console.log(chalk.gray('Main workspaces are protected because they contain shared files that other workspaces symlink to.'));
       return;
     }
 
     const config = configManager.getConfig();
-    const projectConfig = configManager.getProjectConfig(workspace.projectName);
+    const projectConfig = configManager.getProjectConfig(workspace.projectName, project.config);
 
     // Interactive mode if newName not provided
     let resolvedName = newName;
@@ -72,7 +69,7 @@ export async function renameCommand(
         type: 'input',
         name: 'inputName',
         message: 'New branch name or ticket ID:',
-        validate: (input: string) => {
+        validate: (input: string): boolean | string => {
           if (!input.trim()) return 'Name is required';
           return true;
         }
@@ -96,6 +93,7 @@ export async function renameCommand(
     // Infer new branch name using patterns
     const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
     const inferredBranchName = BranchInference.inferBranchName(resolvedName, inferencePatterns);
+    validateBranchName(inferredBranchName);
 
     // Generate new workspace name
     const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;

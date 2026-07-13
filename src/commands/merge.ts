@@ -14,6 +14,7 @@ import {
   fetchAll,
   normalizeBaseBranch,
 } from '../utils/git/index.js';
+import { isMainBranchWorkspace } from '../utils/workspace.js';
 import {
   ErrorHandler,
   WorkspaceNotFoundError,
@@ -48,7 +49,7 @@ export async function mergeCommand(
 
     // Prevent merging main into itself (but allow main → feature)
     const mainBranches = [project.defaultBranch, 'main', 'master'];
-    const sourceIsMain = mainBranches.some(b => sourceWorkspace.branchName === b);
+    const sourceIsMain = isMainBranchWorkspace(sourceWorkspace, project);
     const targetIsMain = mainBranches.some(b => targetBranch === b);
 
     if (sourceIsMain && targetIsMain) {
@@ -85,6 +86,10 @@ export async function mergeCommand(
     }
 
     const commitsAhead = await getCommitCountAhead(sourceWorkspace.path, targetBranch);
+    if (commitsAhead === null) {
+      console.log(chalk.red(`✗ Could not compare '${sourceWorkspace.branchName}' with '${targetBranch}' — is '${targetBranch}' a valid ref?`));
+      return;
+    }
     if (commitsAhead === 0 && !options.force) {
       console.log(chalk.yellow(`'${sourceWorkspace.branchName}' has no commits ahead of '${targetBranch}'`));
       return;
@@ -197,24 +202,30 @@ async function resolveSourceWorkspace(
   options: MergeCommandOptions
 ): Promise<Workspace | null> {
   if (workspace) {
-    // Find by name or branch name
-    const allWorkspaces = dbManager.getAllWorkspaces();
-    const found = allWorkspaces.find(w =>
+    // Find by name or branch name, scoped to -p <project> when given
+    const allWorkspaces = options.project
+      ? dbManager.getWorkspacesByProject(options.project)
+      : dbManager.getAllWorkspaces();
+    const found = allWorkspaces.filter(w =>
       w.name === workspace || w.branchName === workspace
     );
-    if (!found) {
+    if (found.length === 0) {
       const available = allWorkspaces.map(w => w.name);
       throw new WorkspaceNotFoundError(workspace, available);
     }
-    return found;
+    if (found.length > 1) {
+      throw new GitRepositoryError(
+        `Workspace '${workspace}' exists in multiple projects: ${found.map(w => w.projectName).join(', ')}. Use -p <project> to disambiguate.`
+      );
+    }
+    return found[0] ?? null;
   }
 
   // Try current workspace context
   const current = dbManager.getCurrentWorkspaceContext();
   if (current) {
     const project = dbManager.getProject(current.projectName);
-    const mainBranches = [project?.defaultBranch, 'main', 'master'].filter(Boolean);
-    const isMain = mainBranches.some(b => current.branchName === b || current.name === b);
+    const isMain = isMainBranchWorkspace(current, project);
 
     if (!isMain) {
       // In a feature workspace — use it as source
@@ -275,9 +286,8 @@ async function selectSourceWorkspace(
   }
 
   // Filter to non-main workspaces in this project
-  const mainBranches = [project.defaultBranch, 'main', 'master'];
   const featureWorkspaces = dbManager.getWorkspacesByProject(resolvedProject).filter(w =>
-    !mainBranches.some(b => w.branchName === b || w.name === b)
+    !isMainBranchWorkspace(w, project)
   );
 
   if (featureWorkspaces.length === 0) {
@@ -307,11 +317,6 @@ async function selectSourceWorkspace(
   return selected;
 }
 
-function isMainBranch(workspace: Workspace, project?: Project): boolean {
-  const mainBranches = [project?.defaultBranch, 'main', 'master'].filter(Boolean);
-  return mainBranches.some(b => workspace.branchName === b || workspace.name === b);
-}
-
 async function resolveRebaseFeature(
   dbManager: DatabaseManager,
   workspace: string | undefined,
@@ -330,7 +335,7 @@ async function resolveRebaseFeature(
 
   // No explicit feature: use the current workspace if it's a feature branch.
   const current = dbManager.getCurrentWorkspaceContext();
-  if (current && !isMainBranch(current, dbManager.getProject(current.projectName))) {
+  if (current && !isMainBranchWorkspace(current, dbManager.getProject(current.projectName))) {
     return current;
   }
 
@@ -460,14 +465,16 @@ async function cleanupSourceWorkspace(
       await removeWorktree(project.bareRepoPath, workspace.path);
     }
 
-    // Delete the merged branch
+    // Delete the merged branch. -D because after a squash merge the branch is
+    // not an ancestor of the target, so -d would refuse even though wkt just
+    // merged its content.
     try {
       await executeCommand(
-        ['git', 'branch', '-d', workspace.branchName],
+        ['git', 'branch', '-D', workspace.branchName],
         project.bareRepoPath
       );
     } catch {
-      // Branch deletion failed (maybe already deleted or not fully merged) — not critical
+      // Branch deletion failed (maybe already deleted) — not critical
     }
 
     dbManager.removeWorkspace(workspace.id);

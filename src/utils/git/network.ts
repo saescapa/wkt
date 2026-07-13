@@ -19,36 +19,3 @@ export async function fetchAll(bareRepoPath: string): Promise<void> {
     throw error;
   }
 }
-
-export async function fetchInWorkspace(workspacePath: string): Promise<void> {
-  await withRetry(
-    () => executeCommand(['git', 'fetch', 'origin'], workspacePath),
-    'Fetch from origin'
-  );
-}
-
-export async function pullWithRebase(workspacePath: string): Promise<void> {
-  await withRetry(
-    () => executeCommand(['git', 'pull', '--rebase'], workspacePath),
-    'Pull with rebase'
-  );
-}
-
-export async function pushBranch(workspacePath: string, branchName: string, force: boolean = false): Promise<void> {
-  const args = ['git', 'push', 'origin', branchName];
-  if (force) {
-    args.push('--force-with-lease');
-  }
-  await withRetry(
-    () => executeCommand(args, workspacePath),
-    `Push branch ${branchName}`
-  );
-}
-
-export async function pushHEADToRemote(workspacePath: string, remoteBranch: string): Promise<void> {
-  // Push HEAD to the specified remote branch (useful for detached HEAD states)
-  await withRetry(
-    () => executeCommand(['git', 'push', 'origin', `HEAD:${remoteBranch}`], workspacePath),
-    `Push HEAD to origin/${remoteBranch}`
-  );
-}

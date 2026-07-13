@@ -16,6 +16,7 @@ import {
 } from '../utils/git/index.js';
 import { BranchInference } from '../utils/branch-inference.js';
 import { setupSharedSymlinks } from '../utils/shared-symlinks.js';
+import { validateBranchName } from '../utils/validation.js';
 import {
   ErrorHandler,
   ProjectNotFoundError,
@@ -49,10 +50,11 @@ export async function createCommand(
     }
 
     const config = configManager.getConfig();
-    const projectConfig = configManager.getProjectConfig(projectName);
+    const projectConfig = configManager.getProjectConfig(projectName, project.config);
 
     const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
     const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
+    validateBranchName(inferredBranchName);
 
     const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
     const workspaceName = options.name
@@ -150,13 +152,13 @@ export async function createCommand(
         const project = cleanupDbManager.getProject(projectName);
         if (project) {
           const config = cleanupConfigManager.getConfig();
-          const projectConfig = cleanupConfigManager.getProjectConfig(projectName);
+          const projectConfig = cleanupConfigManager.getProjectConfig(projectName, project.config);
           const inferencePatterns = projectConfig.inference?.patterns || config.inference.patterns;
           const inferredBranchName = BranchInference.inferBranchName(branchName, inferencePatterns);
           const namingStrategy = projectConfig.workspace?.naming_strategy || config.workspace.naming_strategy;
           const workspaceName = options.name
-      ? BranchInference.sanitizeWorkspaceName(options.name, namingStrategy)
-      : BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
+            ? BranchInference.sanitizeWorkspaceName(options.name, namingStrategy)
+            : BranchInference.sanitizeWorkspaceName(inferredBranchName, namingStrategy);
           const workspacePath = join(project.workspacesPath, workspaceName);
 
           if (existsSync(workspacePath)) {
@@ -238,7 +240,7 @@ async function selectProjectAndBranch(
     type: 'input',
     name: 'branchName',
     message: 'Branch name or ticket ID:',
-    validate: (input: string) => {
+    validate: (input: string): boolean | string => {
       if (!input.trim()) return 'Branch name is required';
       return true;
     }

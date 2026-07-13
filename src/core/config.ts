@@ -37,14 +37,6 @@ export class ConfigManager {
       },
       workspace: {
         naming_strategy: 'sanitized',
-        auto_cleanup: true,
-        max_age_days: 30,
-      },
-      git: {
-        default_base: 'main',
-        auto_fetch: true,
-        auto_rebase: false,
-        push_on_create: false,
       },
       display: {
         hide_inactive_main_branches: true,
@@ -58,11 +50,6 @@ export class ConfigManager {
         ],
       },
       projects: {},
-      aliases: {
-        ls: 'list',
-        sw: 'switch',
-        rm: 'clean',
-      },
     };
   }
 
@@ -88,11 +75,9 @@ export class ConfigManager {
         ...parsedConfig,
         wkt: { ...defaults.wkt, ...parsedConfig.wkt },
         workspace: { ...defaults.workspace, ...parsedConfig.workspace },
-        git: { ...defaults.git, ...parsedConfig.git },
         display: { ...defaults.display, ...parsedConfig.display },
         inference: { ...defaults.inference, ...parsedConfig.inference },
         projects: { ...defaults.projects, ...parsedConfig.projects },
-        aliases: { ...defaults.aliases, ...parsedConfig.aliases },
       };
       return this.config;
     } catch (error) {
@@ -119,25 +104,26 @@ export class ConfigManager {
     this.saveConfig();
   }
 
-  getProjectConfig(projectName: string): ProjectConfig {
+  /**
+   * Resolve a project's effective config: the `projects` section of the
+   * global config, overlaid with the project's stored config (set by
+   * templates at init / --apply-template time and persisted on the DB
+   * Project record, passed in by the caller).
+   */
+  getProjectConfig(projectName: string, projectOverrides?: ProjectConfig): ProjectConfig {
     const globalConfig = this.getConfig();
-    return globalConfig.projects[projectName] || {};
+    const fromGlobal = globalConfig.projects[projectName] || {};
+    if (!projectOverrides) {
+      return fromGlobal;
+    }
+    return {
+      workspace: { ...fromGlobal.workspace, ...projectOverrides.workspace },
+      inference: projectOverrides.inference ?? fromGlobal.inference,
+    };
   }
 
-  getWorkspaceConfig(workspacePath: string): ProjectConfig {
-    const localConfigPath = join(workspacePath, '.wkt.yaml');
-
-    if (!existsSync(localConfigPath)) {
-      return {};
-    }
-
-    try {
-      const configContent = readFileSync(localConfigPath, 'utf-8');
-      return parse(configContent) as ProjectConfig;
-    } catch (error) {
-      console.warn(`Warning: Failed to parse ${localConfigPath}:`, error);
-      return {};
-    }
+  getConfigPath(): string {
+    return this.configPath;
   }
 
   updateProjectConfig(projectName: string, config: ProjectConfig): void {
