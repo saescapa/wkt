@@ -1,0 +1,54 @@
+# WKT configuration example
+# ==========================
+# Copy (or merge) into ~/.wkt/config.yaml. Every key shown here is read by
+# the current implementation — see docs/reference/configuration.md.
+#
+# WKT creates this file with defaults on first run, so you only need to edit
+# the sections you want to change.
+
+# Filesystem layout. Defaults derive from the WKT base dir
+# (~/.wkt, overridable with the WKT_HOME environment variable).
+wkt:
+  workspace_root: "~/.wkt/workspaces"   # Worktrees, grouped by project
+  projects_root: "~/.wkt/projects"      # Bare repositories
+  shared_root: "~/.wkt/shared"          # Per-project shared dirs (auto-symlinked)
+
+# How workspace directory names are derived from branch names.
+workspace:
+  naming_strategy: "sanitized"          # sanitized | kebab-case | snake_case
+
+# `wkt list` display behavior.
+display:
+  hide_inactive_main_branches: true     # Collapse idle main workspaces
+  main_branch_inactive_days: 7          # ...after this many days unused
+
+# Branch inference: expand short inputs into full branch names.
+# `wkt create my-project 1234` -> branch feature/eng-1234
+inference:
+  patterns:
+    - pattern: '^(\d+)$'
+      template: 'feature/eng-{}'
+    - pattern: '^(eng-\d+)$'
+      template: 'feature/{}'
+    - pattern: '^(feature/.+)$'
+      template: '{}'
+
+# Per-project overrides (same shape as the workspace/inference sections).
+projects:
+  my-project:
+    workspace:
+      naming_strategy: "kebab-case"
+    inference:
+      patterns:
+        - pattern: '^(\d+)$'
+          template: 'feature/PROJ-{}'
+
+# Reusable project templates. Apply at init (`wkt init <url> --template ticket-flow`)
+# or later (`wkt init <project> --apply-template --template ticket-flow`).
+# Applied template config takes priority over the `projects` section.
+project_templates:
+  ticket-flow:
+    inference:
+      patterns:
+        - pattern: '^(\d+)$'
+          template: 'feature/TICKET-{}'

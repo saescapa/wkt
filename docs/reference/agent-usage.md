@@ -110,10 +110,15 @@ Merging a branch into the default branch auto-re-points any workspace stacked on
 ### `wkt clean`
 
 ```
-wkt clean [workspace] [--merged|--older-than <dur>|--all] --force
+wkt clean [workspace] [-p <project>] [--merged|--older-than <dur>|--all] --force
 ```
 
 `--force` is **required** non-interactively to skip the checkbox selection. Orphan cleanup is skipped non-interactively (it requires interactive selection).
+
+Safety rails:
+- `-p <project>` scopes bulk cleanup to one project and disambiguates a workspace name that exists in multiple projects (ambiguous names error without it)
+- Workspaces with uncommitted changes or unmerged commits are skipped unless `--force` is passed
+- Main workspaces and workspaces whose merge status cannot be verified are **never** removed, even with `--force`
 
 ### `wkt rename`
 

@@ -8,6 +8,8 @@ Workspace manager for git repositories. Create isolated development environments
 - **Shared Directory** - Per-project untracked files (`.env`, IDE settings, `docs.local/`) auto-symlinked into every workspace
 - **Fuzzy Navigation** - Quick switching with search
 - **Local Merge** - Merge feature branches into main without going through a PR
+- **Stacking** - Branch off a feature branch; bases are tracked and re-pointed when the parent merges
+- **Reconcile** - Detect and repair drift between git worktrees and the wkt database
 
 ## Install
 
@@ -39,6 +41,7 @@ wkt clean                                      # Remove merged branches
 | `clean` | Remove merged workspaces |
 | `rename <name>` | Rename/recycle workspace |
 | `merge [workspace]` | Merge a workspace into the target branch locally |
+| `reconcile` | Detect and fix git/database drift |
 | `info` | Current workspace details |
 | `shared` | Print path to project's shared directory |
 | `config` | View/edit configuration |

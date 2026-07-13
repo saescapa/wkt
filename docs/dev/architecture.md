@@ -24,11 +24,13 @@ src/
 │   ├── switch.ts         # wkt switch
 │   ├── list.ts           # wkt list
 │   ├── clean.ts          # wkt clean
+│   ├── merge.ts          # wkt merge (and --rebase)
 │   ├── rename.ts         # wkt rename
-│   ├── reconcile.ts        # wkt reconcile
+│   ├── reconcile.ts      # wkt reconcile
 │   ├── info.ts           # wkt info
 │   ├── shared.ts         # wkt shared
-│   └── config.ts         # wkt config
+│   ├── config.ts         # wkt config
+│   └── help.ts           # wkt help (topic help, e.g. agent)
 ├── core/                 # Core abstractions
 │   ├── config.ts         # ConfigManager class
 │   ├── database.ts       # DatabaseManager class
@@ -37,20 +39,21 @@ src/
 └── utils/                # Utilities
     ├── git/              # Git operations (modular)
     │   ├── index.ts      # Re-exports all git functions
-    │   ├── command.ts    # Base command execution
+    │   ├── command.ts    # Base command execution + parseDuration
     │   ├── repository.ts # Repository operations
-    │   ├── branches.ts   # Branch operations
+    │   ├── branches.ts   # Branch operations, merge detection
     │   ├── worktrees.ts  # Worktree operations
     │   ├── status.ts     # Status and diff operations
     │   └── network.ts    # Network operations with retry
     ├── branch-inference.ts   # BranchInference class
     ├── shared-symlinks.ts    # setupSharedSymlinks for shared-dir → workspace
-    ├── validation.ts     # Input validation
+    ├── validation.ts     # Input validation at the CLI trust boundary
+    ├── workspace.ts      # isMainBranchWorkspace predicate
+    ├── interactive.ts    # Non-interactive (-y) mode helpers
     ├── format.ts         # Output formatting
     ├── errors.ts         # WKTError and error classes
     ├── logger.ts         # Debug logging utility
-    ├── retry.ts          # Network retry with backoff
-    └── constants.ts      # Shared constants
+    └── retry.ts          # Network retry with backoff
 ```
 
 ## Core Concepts
@@ -80,6 +83,16 @@ Key methods:
 - `addWorkspace()` / `getWorkspace()` / `getAllWorkspaces()` — Workspace CRUD
 - `getWorkspaceFromPath()` — Detect workspace from current directory
 - `getCurrentWorkspaceContext()` — Get workspace from current directory (calls `getWorkspaceFromPath`)
+
+Every mutating method goes through an exclusive on-disk lock
+(`database.json.lock`, a directory created with atomic `mkdir`): the file is
+re-read under the lock, the mutation applied, and the result saved. This keeps
+concurrent wkt processes (the parallel-agent workflow) from clobbering each
+other's writes. Locks older than 10s are treated as abandoned and stolen.
+
+Note that `Workspace.status` / `commitsAhead` / `commitsBehind` are cached
+snapshots refreshed only by mutating commands. `wkt list --dirty` recomputes
+status live because it is used as a safety check before `wkt clean`.
 
 ### Database Migrations (`src/core/migrations.ts`)
 
@@ -112,14 +125,14 @@ The guard in `migrateDatabase()` also warns (and leaves the data untouched) when
 
 The `ConfigManager` class handles YAML configuration with a merge hierarchy:
 
-1. Workspace `.wkt.yaml` (highest priority)
-2. Project section in global config
-3. Global `~/.wkt/config.yaml` (lowest priority)
+1. Project template config stored on the DB `Project.config` record (highest priority)
+2. Project section (`projects.<name>`) in the global config
+3. Global `~/.wkt/config.yaml` defaults (lowest priority)
 
 Key methods:
 - `getConfig()` — Load merged global configuration
-- `getProjectConfig(projectName)` — Get project-specific overrides
-- `getWorkspaceConfig(workspacePath)` — Load workspace-local config
+- `getProjectConfig(projectName, projectOverrides?)` — Resolve a project's effective config (callers pass the DB project's stored `config`)
+- `getConfigPath()` — Path to the config file (honors `WKT_HOME`)
 - `ensureConfigDir()` — Initialize WKT directories
 
 ### Git Operations (`src/utils/git/`)
@@ -138,23 +151,24 @@ Git operations are organized into focused modules with direct function exports:
 **`branches.ts`** — Branch operations:
 - `getCurrentBranch()` — Get checked-out branch
 - `branchExists()` — Check if branch exists (local or remote)
-- `isBranchMerged()` — Detect if branch was merged (supports squash merges)
+- `getLatestBranchReference()` / `normalizeBaseBranch()` — Resolve remote-vs-local refs for a base branch
+- `getMergeStatus()` — Tri-state merge detection (`merged` / `unmerged` / `unknown`), including squash merges via patch-id
 - `getBranchAge()` — Get last commit date
 - `rebaseBranch()` — Rebase onto target branch
 
 **`worktrees.ts`** — Worktree management:
-- `createWorktree()` / `removeWorktree()` / `moveWorktree()` — CRUD operations
+- `createWorktree()` / `removeWorktree()` / `moveWorktree()` — CRUD operations (createWorktree also seeds empty repos)
 - `listWorktrees()` — List all worktrees for a repo
 
 **`status.ts`** — Status operations:
 - `getWorkspaceStatus()` — Get staged/unstaged/untracked counts
 - `isWorkingTreeClean()` — Check for uncommitted changes
 - `getCommitsDiff()` — Count commits ahead/behind base
+- `getCommitCountAhead()` — Commits ahead of a base (`null` when the comparison fails)
+- `getLastCommitInfo()` — Hash/date/message of the last commit
 
 **`network.ts`** — Network operations with automatic retry:
-- `fetchAll()` / `fetchInWorkspace()` — Fetch from remotes
-- `pullWithRebase()` — Pull with rebase
-- `pushBranch()` — Push to remote
+- `fetchAll()` — Fetch all remotes (tolerates empty repositories)
 
 All functions use debug logging and network operations automatically retry up to 3 times with exponential backoff.
 
@@ -223,12 +237,14 @@ const result = await withRetry(
 
 Automatically retries on network errors like connection timeouts and DNS failures.
 
-### Constants (`src/utils/constants.ts`)
+### Validation (`src/utils/validation.ts`)
 
-Shared constants including:
-- Default timeouts and limits
-- Validation patterns
-- Error and success message templates
+Input validation at the CLI trust boundary, called before values reach git or
+the filesystem:
+
+- `validateProjectName()` — project names become directory names (no traversal, no leading `-`)
+- `validateBranchName()` — branch names reach git as positionals (no leading `-`)
+- `validateRepositoryUrl()` — restricts `wkt init` URLs to http(s)/ssh/git/file, scp-style, or existing local paths (blocks `ext::` and option-injection transports)
 
 ## Command Flow
 
@@ -239,7 +255,7 @@ Shared constants including:
    └── project, branch, options
 
 2. Load configuration
-   └── Global → Project → Workspace config merge
+   └── Global → project section → project template merge
 
 3. Validate inputs
    ├── Project exists?
@@ -265,13 +281,26 @@ Shared constants including:
 
 ```
 test/
-├── unit/                 # Pure function tests
+├── unit/                 # Pure function / module tests
 │   ├── branch-inference.test.ts
 │   ├── config.test.ts
 │   ├── database.test.ts
-│   └── duration.test.ts
-├── e2e/                  # CLI integration tests
-│   └── basic-workflow.test.ts
+│   ├── duration.test.ts
+│   ├── git-status.test.ts
+│   ├── migrations.test.ts
+│   ├── normalize-base-branch.test.ts
+│   └── shared-symlinks.test.ts
+├── e2e/                  # CLI integration tests (run the built binary)
+│   ├── basic-workflow.test.ts
+│   ├── clean-workflow.test.ts
+│   ├── config-workflow.test.ts
+│   ├── init-bare-hooks.test.ts
+│   ├── init-local-workflow.test.ts
+│   ├── merge-conflict.test.ts
+│   ├── reconcile-workflow.test.ts
+│   ├── rename-workflow.test.ts
+│   ├── stacking-workflow.test.ts
+│   └── switch-workflow.test.ts
 └── utils/                # Test utilities
     └── test-helpers.ts
 ```

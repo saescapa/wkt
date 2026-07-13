@@ -217,9 +217,14 @@ Rules for `--force` clean:
   default) over `--all`. Treat `wkt -y clean --all --force` as off-limits unless
   you have confirmed *every* matching workspace is both clean and merged.
 - **When unsure about one workspace, clean it by name**, not via a bulk match —
-  act on exactly what you intend, nothing more.
+  act on exactly what you intend, nothing more. If the name exists in multiple
+  projects, `wkt clean` errors; add `-p <project>` to disambiguate.
 - There is no undo. Uncommitted or unmerged work cannot be recovered once the
   directory is gone. Any doubt → stop and commit/merge first.
+- Built-in backstops (do not rely on them as your only check): dirty and
+  unmerged workspaces are skipped without `--force`, and main workspaces or
+  workspaces whose merge status can't be verified are never removed even with
+  `--force`.
 
 ## Starting the next task from a fresh base
 

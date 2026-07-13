@@ -4,18 +4,24 @@ Complete reference for WKT configuration options.
 
 ## Configuration Files
 
-### Hierarchy (highest to lowest priority)
+All configuration lives in one file: `~/.wkt/config.yaml`. A project's
+effective config is resolved from two sources:
 
-1. **Workspace config** — `.wkt.yaml` in workspace directory
-2. **Project config** — `~/.wkt/config.yaml` `projects` section
-3. **Global config** — `~/.wkt/config.yaml`
+1. **Project template config** — stored on the project record when a template
+   is applied (`wkt init --template <name>` or `wkt init --apply-template`);
+   highest priority
+2. **Project section** — the `projects.<name>` section of `config.yaml`
+3. **Global defaults** — the top-level sections of `config.yaml`
+
+There is no per-workspace config file. Inspect a project's effective config
+with `wkt config --project <name>`.
 
 ### File Locations
 
 ```
 ~/.wkt/
-├── config.yaml          # Global configuration
-├── database.json        # Workspace metadata (managed by WKT)
+├── config.yaml          # All configuration (global + per-project sections)
+├── database.json        # Project/workspace metadata (managed by WKT)
 ├── projects/            # Bare repositories (one dir per project)
 ├── workspaces/          # Worktrees (grouped by project)
 └── shared/              # Per-project shared directories
@@ -35,18 +41,9 @@ wkt:
   projects_root: "/Users/me/.wkt/projects"
   shared_root: "/Users/me/.wkt/shared"
 
-# Git settings
-git:
-  default_base: "main"              # Default base branch
-  auto_fetch: true                  # Auto fetch before operations
-  auto_rebase: false
-  push_on_create: false             # Auto push new branches
-
 # Workspace settings
 workspace:
   naming_strategy: "sanitized"      # sanitized, kebab-case, snake_case
-  auto_cleanup: true                # Auto cleanup merged branches
-  max_age_days: 30
 
 # Display
 display:
@@ -64,19 +61,25 @@ inference:
 # Project-specific overrides
 projects:
   my-project:
-    git:
-      default_base: "develop"
+    workspace:
+      naming_strategy: "kebab-case"
     inference:
       patterns:
         - pattern: '^(\d+)$'
           template: 'feature/PROJ-{}'
 
-# Command aliases
-aliases:
-  ls: list
-  sw: switch
-  rm: clean
+# Reusable project templates (applied via wkt init --template / --apply-template)
+project_templates:
+  ticket-flow:
+    inference:
+      patterns:
+        - pattern: '^(\d+)$'
+          template: 'feature/TICKET-{}'
 ```
+
+The base branch for new workspaces is not configured — it is the project's
+detected default branch (recorded at `wkt init` time), overridable per
+invocation with `wkt create --from <branch>`.
 
 ---
 
@@ -141,34 +144,11 @@ inference:
 
 ---
 
-## Git Settings
-
-```yaml
-git:
-  default_base: "main"           # Default branch for new workspaces
-  auto_fetch: true               # Fetch before operations
-  auto_rebase: false
-  push_on_create: false          # Push branch after creation
-```
-
-Per-project overrides:
-
-```yaml
-projects:
-  legacy-project:
-    git:
-      default_base: "master"
-```
-
----
-
 ## Workspace Settings
 
 ```yaml
 workspace:
   naming_strategy: "sanitized"   # How to name workspace directories
-  auto_cleanup: true             # Auto-remove merged branches
-  max_age_days: 30               # Remove workspaces older than this
 ```
 
 **Naming Strategies:**
@@ -183,22 +163,22 @@ workspace:
 
 ## Project-Specific Configuration
 
-Override any global setting per project under the `projects` key:
+Override naming strategy or inference patterns per project under the
+`projects` key:
 
 ```yaml
 projects:
   my-project:
-    git:
-      default_base: "develop"
-
     workspace:
-      max_age_days: 14
-
+      naming_strategy: "snake_case"
     inference:
       patterns:
         - pattern: '^(\d+)$'
           template: 'feature/PROJ-{}'
 ```
+
+Templates in `project_templates` have the same shape and take priority over
+the `projects` section once applied to a project.
 
 ---
 

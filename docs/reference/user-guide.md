@@ -145,7 +145,7 @@ wkt create my-project feature/auth --description "User authentication system"
 ```
 
 **Options:**
-- `--from <branch>` - Base branch (default: main)
+- `--from <branch>` - Base branch (default: the project's default branch)
 - `--name <name>` - Custom workspace directory name
 - `--description <text>` - Workspace description
 - `--template <template>` - Apply workspace template
@@ -189,7 +189,6 @@ wkt switch auth --path-only
 **Options:**
 - `-s, --search` - Enable fuzzy search mode
 - `-p, --project <name>` - Limit to specific project
-- `--create` - Create workspace if it doesn't exist
 - `--path-only` - Output only the path (for shell integration)
 
 ### `wkt list`
@@ -228,8 +227,10 @@ wkt list --all
 - `--filter <pattern>` - Filter by pattern
 - `--dirty` - Show only workspaces with uncommitted changes
 - `--stale <duration>` - Show workspaces older than duration
-- `--group-by <field>` - Group results (default: project)
+- `--group-by <field>` - `project` (default) groups by project; any other value prints a flat list
 - `-a, --all` - Include inactive main branches
+
+`--dirty` recomputes each workspace's git status live (rather than using the cached status), so it is safe to use as a pre-cleanup check.
 
 **Output Format:**
 
@@ -281,12 +282,17 @@ wkt clean auth-system --force
 ```
 
 **Options:**
-- `-p, --project <name>` - Clean specific project
+- `-p, --project <name>` - Scope to one project (also disambiguates a workspace name that exists in multiple projects)
 - `--merged` - Remove merged workspaces (default)
 - `--older-than <duration>` - Remove stale workspaces
-- `--force` - Skip confirmation
+- `--force` - Override the unmerged-work and dirty-tree guards
 - `--all` - Clean all (overrides --merged)
 - `--no-fetch` - Skip fetching remote refs before merge detection
+
+**Safety rails:**
+- Workspaces with **uncommitted changes** or **unmerged commits** are skipped; `--force` overrides both (after a warning showing what would be lost)
+- **Main workspaces** are never cleaned, even with `--force` (they own the shared-symlink sources)
+- Workspaces whose **merge status can't be verified** (e.g. a failed fetch) are never cleaned, even with `--force` — unverifiable is not the same as merged
 
 ### `wkt merge`
 
@@ -624,13 +630,11 @@ wkt clean
 
 ### Main Branch Protection
 
-Main workspaces are protected from accidental cleanup because they typically reflect the project's default branch.
+Main workspaces are never cleaned — they hold the project's default branch and own the shared files other workspaces symlink to. This protection cannot be overridden with `--force`; remove the project manually if you really mean to.
 
 ```bash
-# This will warn
+# Both of these refuse and explain why
 wkt clean main
-
-# Force if needed
 wkt clean main --force
 ```
 

@@ -261,7 +261,7 @@ chore: upgrade dependencies
 
 1. Update types in `src/core/types.ts`
 2. Update loading in `src/core/config.ts`
-3. Update `.wkt.yaml.example`
+3. Update `config.yaml.example`
 4. Update docs/configuration.md
 
 ### Schema changes
