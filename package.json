@@ -17,7 +17,7 @@
     "test:e2e": "bun run build && bun test test/e2e",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint 'src/**/*.ts' 'test/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
