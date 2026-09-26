@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, lstatSync, readlinkSync, symlinkSync } from 'fs';
+import { existsSync, readdirSync, lstatSync, readlinkSync, symlinkSync, mkdirSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import chalk from 'chalk';
 
@@ -13,54 +13,90 @@ function isIgnoredEntry(entry: string): boolean {
   return IGNORED_ENTRIES.has(entry) || IGNORED_PATTERNS.some((pattern) => pattern.test(entry));
 }
 
-export function setupSharedSymlinks(sharedPath: string, workspacePath: string): void {
-  if (!existsSync(sharedPath)) return;
-
+// A shared entry that is a real directory (not a symlink, e.g. `docs.local`) is mirrored
+// rather than linked whole: the target directory is created if absent and the same linking
+// logic is applied to its children, so pre-existing real files at any depth are preserved.
+function linkTree(
+  sharedDir: string,
+  workspaceDir: string,
+  workspaceRoot: string,
+  quiet: boolean,
+  created: string[],
+  skipped: string[]
+): void {
   let entries: string[];
   try {
-    entries = readdirSync(sharedPath);
+    entries = readdirSync(sharedDir);
   } catch {
     return;
   }
 
-  const created: string[] = [];
-  const skipped: string[] = [];
-
   for (const entry of entries) {
     if (isIgnoredEntry(entry)) continue;
 
-    const source = join(sharedPath, entry);
-    const target = join(workspacePath, entry);
-    const sourceResolved = resolve(source);
+    const source = join(sharedDir, entry);
+    const target = join(workspaceDir, entry);
+    const reportPath = relative(workspaceRoot, target);
+    const sourceStat = lstatSync(source, { throwIfNoEntry: false });
+    if (!sourceStat) continue;
 
+    if (sourceStat.isDirectory()) {
+      const targetStat = lstatSync(target, { throwIfNoEntry: false });
+      if (targetStat) {
+        if (!targetStat.isDirectory() || targetStat.isSymbolicLink()) {
+          skipped.push(reportPath);
+          continue;
+        }
+      } else {
+        try {
+          mkdirSync(target);
+        } catch (error) {
+          if (!quiet) console.log(chalk.yellow(`⚠ Could not create ${reportPath}: ${error instanceof Error ? error.message : String(error)}`));
+          continue;
+        }
+      }
+      linkTree(source, target, workspaceRoot, quiet, created, skipped);
+      continue;
+    }
+
+    const sourceResolved = resolve(source);
     const targetStat = lstatSync(target, { throwIfNoEntry: false });
     if (targetStat) {
       if (targetStat.isSymbolicLink()) {
         try {
           const linkTarget = readlinkSync(target);
-          if (resolve(workspacePath, linkTarget) === sourceResolved) {
+          if (resolve(workspaceDir, linkTarget) === sourceResolved) {
             continue;
           }
         } catch {
           // fall through to skip
         }
       }
-      skipped.push(entry);
+      skipped.push(reportPath);
       continue;
     }
 
     try {
-      symlinkSync(relative(workspacePath, source), target);
-      created.push(entry);
+      symlinkSync(relative(workspaceDir, source), target);
+      created.push(reportPath);
     } catch (error) {
-      console.log(chalk.yellow(`⚠ Could not symlink ${entry}: ${error instanceof Error ? error.message : String(error)}`));
+      if (!quiet) console.log(chalk.yellow(`⚠ Could not symlink ${reportPath}: ${error instanceof Error ? error.message : String(error)}`));
     }
   }
+}
 
-  if (created.length > 0) {
+export function setupSharedSymlinks(sharedPath: string, workspacePath: string, quiet = false): void {
+  if (!existsSync(sharedPath)) return;
+
+  const created: string[] = [];
+  const skipped: string[] = [];
+
+  linkTree(sharedPath, workspacePath, workspacePath, quiet, created, skipped);
+
+  if (!quiet && created.length > 0) {
     console.log(chalk.gray(`Symlinked from shared: ${created.join(', ')}`));
   }
-  if (skipped.length > 0) {
+  if (!quiet && skipped.length > 0) {
     console.log(chalk.yellow(`Skipped (target exists): ${skipped.join(', ')}`));
   }
 }
